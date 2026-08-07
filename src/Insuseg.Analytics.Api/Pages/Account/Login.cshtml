@@ -1,0 +1,40 @@
+@page
+@model Insuseg.Analytics.Api.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Iniciar sesión";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Iniciar sesión — Insuseg Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <div class="insuseg-login-wrap">
+        <div class="insuseg-login-card">
+            <img src="~/img/insuseg-logo.png" alt="Insuseg" />
+            @if (!ModelState.IsValid)
+            {
+                <div class="insuseg-error" asp-validation-summary="ModelOnly"></div>
+            }
+            <form method="post">
+                <div class="insuseg-field">
+                    <label asp-for="Email">Correo</label>
+                    <input asp-for="Email" type="email" autocomplete="username" autofocus />
+                </div>
+                <div class="insuseg-field">
+                    <label asp-for="Password">Contraseña</label>
+                    <input asp-for="Password" type="password" autocomplete="current-password" />
+                </div>
+                <input type="hidden" asp-for="ReturnUrl" />
+                <button type="submit" class="insuseg-btn" style="width:100%">Ingresar</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

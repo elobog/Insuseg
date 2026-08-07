@@ -1,0 +1,63 @@
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<IdentityUser> SignInManager
+@{
+    var currentPath = Context.Request.Path.Value ?? string.Empty;
+    bool IsActive(string prefix) => currentPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] — Insuseg Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    @if (SignInManager.IsSignedIn(User))
+    {
+        <header class="insuseg-header">
+            <img src="~/img/insuseg-logo.png" alt="Insuseg" />
+            <div class="insuseg-user">
+                <span>@User.Identity?.Name</span>
+                <form method="post" asp-page="/Account/Logout">
+                    <button type="submit" class="insuseg-btn-link">Cerrar sesión</button>
+                </form>
+            </div>
+        </header>
+        <div class="insuseg-app">
+            <nav class="insuseg-sidebar">
+                <div class="insuseg-section-title">Ventas</div>
+                <a asp-page="/Ventas/Analisis" class="@(IsActive("/Ventas/Analisis") ? "active" : "")">Análisis</a>
+                <a asp-page="/Ventas/Cartera" class="@(IsActive("/Ventas/Cartera") ? "active" : "")">Cartera de clientes</a>
+                <a asp-page="/Ventas/Sincronizacion" class="@(IsActive("/Ventas/Sincronizacion") ? "active" : "")">Sincronización</a>
+
+                <div class="insuseg-section-title">Compras</div>
+                <a asp-page="/Compras/Analisis" class="@(IsActive("/Compras/Analisis") ? "active" : "")">Análisis</a>
+                <a asp-page="/Compras/Sincronizacion" class="@(IsActive("/Compras/Sincronizacion") ? "active" : "")">Sincronización</a>
+
+                <div class="insuseg-section-title">Inventario</div>
+                <a asp-page="/Inventario/Analisis" class="@(IsActive("/Inventario/Analisis") ? "active" : "")">Análisis</a>
+                <a asp-page="/Inventario/Sincronizacion" class="@(IsActive("/Inventario/Sincronizacion") ? "active" : "")">Sincronización</a>
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <div class="insuseg-section-title">Administración</div>
+                    <a asp-page="/Administracion/Usuarios" class="@(IsActive("/Administracion/Usuarios") ? "active" : "")">Usuarios</a>
+                }
+            </nav>
+            <main class="insuseg-main">
+                @RenderBody()
+            </main>
+        </div>
+    }
+    else
+    {
+        <main>
+            @RenderBody()
+        </main>
+    }
+    <script src="~/js/tablas-expandibles.js"></script>
+</body>
+</html>

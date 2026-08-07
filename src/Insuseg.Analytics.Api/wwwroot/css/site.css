@@ -1,0 +1,762 @@
+/* Paleta e identidad tomadas de insuseg.cl (analizado el 2026-07-22):
+   naranja de marca #ef6000, texto oscuro #303030, gris claro #eaeaea, tipografía Open Sans,
+   formas de borde recto (sin esquinas redondeadas, sin sombras). */
+
+:root {
+    --insuseg-orange: #ef6000;
+    --insuseg-orange-dark: #bc4c00;
+    --insuseg-dark: #303030;
+    --insuseg-gray-light: #eaeaea;
+    --insuseg-gray-bg: #f8f8f8;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Open Sans', sans-serif;
+    color: var(--insuseg-dark);
+    background: var(--insuseg-gray-bg);
+    margin: 0;
+}
+
+.insuseg-header {
+    background: #fff;
+    border-bottom: 1px solid var(--insuseg-gray-light);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.insuseg-header img {
+    height: 40px;
+}
+
+.insuseg-header .insuseg-user {
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.insuseg-app {
+    display: flex;
+    align-items: stretch;
+    min-height: calc(100vh - 57px);
+}
+
+.insuseg-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--insuseg-dark);
+    padding: 1.25rem 0;
+}
+
+.insuseg-sidebar .insuseg-section-title {
+    color: #9a9a9a;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.9rem 1.25rem 0.35rem;
+}
+
+.insuseg-sidebar a {
+    display: block;
+    color: #e8e8e8;
+    text-decoration: none;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.92rem;
+    border-left: 3px solid transparent;
+}
+
+.insuseg-sidebar a:hover {
+    background: #3d3d3d;
+}
+
+.insuseg-sidebar a.active {
+    border-left-color: var(--insuseg-orange);
+    background: #3d3d3d;
+    color: #fff;
+    font-weight: 600;
+}
+
+.insuseg-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.insuseg-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+}
+
+h1, h2, h3 {
+    font-weight: 700;
+    color: var(--insuseg-dark);
+}
+
+.insuseg-btn {
+    display: inline-block;
+    background: var(--insuseg-orange);
+    color: #fff;
+    border: none;
+    padding: 0.65rem 1.5rem;
+    font-family: 'Open Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-decoration: none;
+    cursor: pointer;
+    border-radius: 0;
+}
+
+.insuseg-btn:hover {
+    background: var(--insuseg-orange-dark);
+    color: #fff;
+}
+
+.insuseg-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.insuseg-btn-link {
+    background: none;
+    color: var(--insuseg-orange);
+    border: none;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.insuseg-card {
+    background: #fff;
+    border: 1px solid var(--insuseg-gray-light);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.insuseg-login-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--insuseg-gray-bg);
+}
+
+.insuseg-login-card {
+    background: #fff;
+    border: 1px solid var(--insuseg-gray-light);
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 380px;
+}
+
+.insuseg-login-card img {
+    height: 44px;
+    display: block;
+    margin: 0 auto 1.5rem;
+}
+
+.insuseg-field {
+    margin-bottom: 1rem;
+}
+
+.insuseg-field label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+}
+
+.insuseg-field input {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--insuseg-gray-light);
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1rem;
+    border-radius: 0;
+}
+
+.insuseg-field input:focus {
+    outline: none;
+    border-color: var(--insuseg-orange);
+}
+
+.insuseg-error {
+    background: #fdeceb;
+    border: 1px solid #e0a89f;
+    color: #9c3320;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.insuseg-summary {
+    background: #fff4ec;
+    border: 1px solid var(--insuseg-orange);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+table.insuseg-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+table.insuseg-table th {
+    background: var(--insuseg-dark);
+    color: #fff;
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    font-weight: 600;
+}
+
+table.insuseg-table td {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--insuseg-gray-light);
+}
+
+table.insuseg-table tr:nth-child(even) {
+    background: var(--insuseg-gray-bg);
+}
+
+/* Filtro de fechas: una fila, arriba de todo el contenido analítico. */
+.insuseg-filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.insuseg-filters .insuseg-field {
+    margin-bottom: 0;
+}
+
+/* KPIs: fila de "stat tiles" — label + valor grande, sin gráfico. */
+.insuseg-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.insuseg-kpi {
+    background: #fff;
+    border: 1px solid var(--insuseg-gray-light);
+    padding: 1.1rem 1.25rem;
+}
+
+.insuseg-kpi .insuseg-kpi-label {
+    font-size: 0.8rem;
+    color: #696969;
+    margin-bottom: 0.35rem;
+}
+
+.insuseg-kpi .insuseg-kpi-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--insuseg-dark);
+}
+
+.insuseg-kpi .insuseg-kpi-sub {
+    font-size: 0.78rem;
+    color: #969696;
+    margin-top: 0.2rem;
+}
+
+/* Variante para un dato secundario que sí debe destacar (ej. % de margen) — más grande que
+   insuseg-kpi-sub y en el naranja de marca, en vez de gris apagado. */
+.insuseg-kpi .insuseg-kpi-highlight {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--insuseg-orange);
+    margin-top: 0.25rem;
+}
+
+/* Gráfico de barras horizontal, en HTML/CSS plano (no librería):
+   una sola tonalidad de marca (magnitud, no identidad), barra fina con
+   extremo redondeado, valor como texto fuera de la barra. */
+.insuseg-barchart {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.insuseg-bar-row {
+    display: grid;
+    grid-template-columns: 160px 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.insuseg-bar-row .insuseg-bar-label {
+    font-size: 0.85rem;
+    color: var(--insuseg-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.insuseg-bar-track {
+    background: var(--insuseg-gray-bg);
+    height: 20px;
+}
+
+.insuseg-bar-fill {
+    background: var(--insuseg-orange);
+    height: 20px;
+    max-width: 100%;
+    border-radius: 0 4px 4px 0;
+}
+
+.insuseg-bar-row .insuseg-bar-value {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--insuseg-dark);
+    font-variant-numeric: tabular-nums;
+    min-width: 90px;
+    text-align: right;
+}
+
+.insuseg-charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .insuseg-charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .insuseg-app {
+        flex-direction: column;
+    }
+
+    .insuseg-sidebar {
+        width: 100%;
+        display: flex;
+        overflow-x: auto;
+    }
+}
+
+/* KPI con signo — reutiliza insuseg-kpi, solo cambia el color del valor. */
+.insuseg-kpi.kpi-bad .insuseg-kpi-value {
+    color: var(--insuseg-orange-dark);
+}
+
+.insuseg-kpi.kpi-good .insuseg-kpi-value {
+    color: #2f7a3d;
+}
+
+/* Ventas > Cartera de clientes: tabla dinámica por mes con detalle de producto expandible. */
+.insuseg-subtitle {
+    color: #696969;
+    font-size: 0.92rem;
+    margin: 0 0 1.5rem;
+}
+
+.detalle-nota {
+    color: #696969;
+    font-size: 0.85rem;
+    margin: 0 0 1rem;
+}
+
+.tabla-scroll {
+    overflow-x: auto;
+}
+
+table.insuseg-table th.col-total,
+table.insuseg-table td.col-total {
+    border-left: 2px solid var(--insuseg-gray-light);
+    font-weight: 700;
+}
+
+table.insuseg-table th.col-calc,
+table.insuseg-table td.col-calc {
+    color: #696969;
+}
+
+table.insuseg-table td.col-mg {
+    font-weight: 600;
+}
+
+.fila-cliente {
+    cursor: pointer;
+}
+
+.fila-cliente:hover td,
+.fila-cliente.expandida td {
+    background: var(--insuseg-gray-bg);
+}
+
+/* Columnas fijas al scrollear horizontalmente (N° y Cliente) — el fondo se hereda de la fila para que
+   siga la franja cebra/hover/expandida en vez de quedar siempre blanco. */
+table.insuseg-table tbody tr,
+table.insuseg-table-mini tbody tr {
+    background: #fff;
+}
+
+.col-sticky {
+    position: sticky;
+    z-index: 2;
+    background: inherit;
+}
+
+.col-sticky-1 {
+    left: 0;
+    width: 40px;
+}
+
+.col-sticky-2 {
+    left: 40px;
+    min-width: 200px;
+    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.2);
+}
+
+/* Tabla mini de detalle por producto: una sola columna fija (Producto), sin columna de N° al lado. */
+.col-sticky-solo {
+    left: 0;
+    min-width: 180px;
+    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.2);
+}
+
+.nombre-cliente {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chevron {
+    display: inline-flex;
+    color: var(--insuseg-orange);
+    font-size: 0.7rem;
+    transition: transform 0.15s ease;
+}
+
+.fila-cliente.expandida .chevron {
+    transform: rotate(90deg);
+}
+
+.chip-vendedor {
+    font-size: 0.7rem;
+    color: #696969;
+    background: var(--insuseg-gray-bg);
+    border: 1px solid var(--insuseg-gray-light);
+    padding: 0.05rem 0.4rem;
+    white-space: nowrap;
+}
+
+.fila-detalle {
+    display: none;
+}
+
+.fila-detalle.abierta {
+    display: table-row;
+}
+
+.fila-detalle td {
+    padding: 0;
+    background: var(--insuseg-gray-bg);
+    /* Sin esto, una tabla mini ancha (muchos meses) estira TODA la tabla externa para acomodarla
+       en vez de scrollear puertas adentro — width:0 le saca a esta celda "colspan" el peso en el
+       cálculo de ancho de la tabla, dejando que las filas normales lo determinen. */
+    width: 0;
+}
+
+.detalle-wrap {
+    padding: 1.25rem 1.5rem 1.5rem 2.75rem;
+}
+
+.detalle-header {
+    margin-bottom: 0.4rem;
+}
+
+.detalle-header h3 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+table.insuseg-table-mini {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    background: #fff;
+}
+
+table.insuseg-table-mini th {
+    background: #4a4a4a;
+    color: #fff;
+    text-align: left;
+    padding: 0.45rem 0.6rem;
+    font-weight: 600;
+}
+
+table.insuseg-table-mini td {
+    padding: 0.42rem 0.6rem;
+    border-bottom: 1px solid var(--insuseg-gray-light);
+}
+
+table.insuseg-table-mini tr:nth-child(even) {
+    background: var(--insuseg-gray-bg);
+}
+
+.nota-sin-limite {
+    color: #696969;
+    font-size: 0.8rem;
+    margin: 0.75rem 0 0;
+}
+
+/* Tablas sin tope de filas: alto máximo con scroll propio, para que no empujen el resto de la página
+   hacia abajo — se scrollea la tabla, no toda la pantalla, para llegar a lo que sigue. */
+.tabla-vertical-limitada {
+    max-height: 420px;
+    overflow-y: auto;
+    border: 1px solid var(--insuseg-gray-light);
+}
+
+.tabla-vertical-limitada table.insuseg-table {
+    border: none;
+}
+
+.tabla-vertical-limitada table th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+.tabla-vertical-limitada.expandida {
+    max-height: none;
+    overflow-y: visible;
+}
+
+/* Detalle por producto (Ventas > Cartera): mismo patrón de scroll acotado + header pegajoso que el
+   resto de la app, pero más bajo — es contenido anidado dentro de una fila ya expandida. */
+.tabla-detalle-mini {
+    max-height: 300px;
+}
+
+.btn-expandir-tabla {
+    display: block;
+    margin: 0 0 0.5rem auto;
+    background: none;
+    border: 1px solid var(--insuseg-gray-light);
+    color: var(--insuseg-dark);
+    padding: 0.3rem 0.7rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.btn-expandir-tabla:hover {
+    border-color: var(--insuseg-orange);
+    color: var(--insuseg-orange);
+}
+
+/* Gráfico de tendencia (línea + área) — Cartera de clientes. Un solo hue de marca (naranja),
+   consistente con el resto de los gráficos de la app. */
+.viz-tendencia {
+    position: relative;
+}
+
+.viz-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.viz-baseline {
+    stroke: var(--insuseg-gray-light);
+    stroke-width: 1;
+}
+
+.viz-area {
+    fill: var(--insuseg-orange);
+    opacity: 0.1;
+}
+
+.viz-linea {
+    fill: none;
+    stroke: var(--insuseg-orange);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.viz-punto {
+    fill: var(--insuseg-orange);
+    stroke: #fff;
+    stroke-width: 2;
+}
+
+.viz-etiqueta-valor {
+    font-size: 11px;
+    fill: var(--insuseg-dark);
+    font-weight: 600;
+}
+
+.viz-crosshair {
+    stroke: var(--insuseg-gray-light);
+    stroke-width: 1;
+    pointer-events: none;
+}
+
+.viz-crosshair-punto {
+    fill: var(--insuseg-orange);
+    stroke: #fff;
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+.viz-eje-x {
+    position: relative;
+    height: 16px;
+    margin-top: 0.25rem;
+}
+
+.viz-eje-x span {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: #969696;
+    white-space: nowrap;
+}
+
+/* Margen por mes — barras verticales (eje es tiempo, no un ranking, por eso no son horizontales
+   como "Ventas por cliente"). El % Mg es el dato que más pesa (grande, naranja); el monto es apoyo
+   chico y gris. La altura de la barra sigue representando el monto, no el %, para no perder la
+   comparación de magnitud entre meses. */
+/* Con muchos meses en el filtro, las columnas ya no pueden achicarse infinito — a partir de cierto
+   ancho mínimo, el gráfico scrollea horizontalmente puertas adentro en vez de aplastar el texto. */
+.margen-chart-scroll {
+    overflow-x: auto;
+}
+
+.margen-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.6rem;
+    height: 200px;
+    padding-top: 1.6rem;
+    border-bottom: 1px solid var(--insuseg-gray-light);
+}
+
+.margen-barra-col {
+    flex: 1 0 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+}
+
+.margen-pct {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--insuseg-orange);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.margen-valor {
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: #696969;
+    margin-bottom: 0.4rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.margen-barra {
+    width: 100%;
+    max-width: 34px;
+    background: var(--insuseg-orange);
+    transition: background 0.15s ease;
+}
+
+.margen-barra-col:hover .margen-barra {
+    background: var(--insuseg-orange-dark);
+}
+
+.margen-barra-col.destacada .margen-barra {
+    background: var(--insuseg-orange-dark);
+}
+
+.margen-barra-col.destacada .margen-pct {
+    color: var(--insuseg-orange-dark);
+}
+
+.margen-eje-x {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+}
+
+.margen-eje-x span {
+    flex: 1 0 56px;
+    text-align: center;
+    font-size: 0.72rem;
+    color: #969696;
+}
+
+.viz-tooltip {
+    position: absolute;
+    top: 0.25rem;
+    transform: translateX(-50%);
+    background: var(--insuseg-dark);
+    color: #fff;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.78rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 2;
+}
+
+.viz-tooltip strong {
+    font-size: 0.85rem;
+}
+
+.viz-tooltip span {
+    color: #c9c9c9;
+}
+
+.viz-tooltip-derecha {
+    transform: translateX(-100%);
+}
+
+/* Barra apilada de composición (part-to-whole, 2 segmentos) — Análisis de ventas. */
+.viz-stack {
+    display: flex;
+    height: 32px;
+    background: var(--insuseg-gray-bg);
+}
+
+.viz-stack-seg {
+    display: flex;
+    align-items: center;
+    padding: 0 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.viz-stack-margen {
+    background: var(--insuseg-orange);
+    border-right: 2px solid #fff;
+}
+
+.viz-stack-costo {
+    background: #6b6b6b;
+}

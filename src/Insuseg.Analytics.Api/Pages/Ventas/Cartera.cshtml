@@ -1,0 +1,229 @@
+@page
+@using System.Globalization
+@model Insuseg.Analytics.Api.Pages.Ventas.CarteraModel
+@{
+    ViewData["Title"] = "Cartera de clientes";
+    var colspanDetalle = Model.Meses.Count + 7;
+
+    // Geometría del gráfico de tendencia — se calcula acá (no en el PageModel) porque es puramente de
+    // presentación: coordenadas SVG, no datos de negocio.
+    var puntosTendencia = Model.TendenciaMensual;
+    var maxMontoTendencia = puntosTendencia.Count > 0 ? puntosTendencia.Max(p => p.Monto) : 0m;
+    const double anchoSvg = 900, altoSvg = 200, padIzq = 12, padDer = 12, padSup = 16, padInf = 30;
+    const double anchoUtilSvg = anchoSvg - padIzq - padDer;
+    const double altoUtilSvg = altoSvg - padSup - padInf;
+    string F(double v) => v.ToString("F1", CultureInfo.InvariantCulture);
+    var coordsTendencia = puntosTendencia.Select((p, i) => new
+    {
+        p.Etiqueta,
+        p.Monto,
+        X = puntosTendencia.Count > 1 ? padIzq + anchoUtilSvg * i / (puntosTendencia.Count - 1) : padIzq + anchoUtilSvg / 2,
+        Y = padSup + altoUtilSvg - (maxMontoTendencia > 0 ? (double)(p.Monto / maxMontoTendencia) * altoUtilSvg : 0),
+    }).ToList();
+    var lineaPathTendencia = coordsTendencia.Count > 0
+        ? string.Join(" ", coordsTendencia.Select((c, i) => $"{(i == 0 ? "M" : "L")}{F(c.X)},{F(c.Y)}"))
+        : "";
+    var areaPathTendencia = coordsTendencia.Count > 0
+        ? lineaPathTendencia + $" L{F(coordsTendencia[^1].X)},{F(padSup + altoUtilSvg)} L{F(coordsTendencia[0].X)},{F(padSup + altoUtilSvg)} Z"
+        : "";
+    var pasoEtiquetaTendencia = coordsTendencia.Count > 14 ? (int)Math.Ceiling(coordsTendencia.Count / 14.0) : 1;
+    var puntosTendenciaJson = System.Text.Json.JsonSerializer.Serialize(
+        coordsTendencia.Select(c => new { x = c.X, y = c.Y, etiqueta = c.Etiqueta, monto = c.Monto }));
+}
+<div class="insuseg-container">
+    <h1>Cartera de clientes</h1>
+    <p class="insuseg-subtitle">Ventas mensuales por cliente. Hacé clic en un cliente para ver el detalle por producto.</p>
+
+    <form method="get" class="insuseg-filters">
+        <div class="insuseg-field">
+            <label for="desde">Desde</label>
+            <input type="date" id="desde" name="Desde" value="@Model.Desde?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="insuseg-field">
+            <label for="hasta">Hasta</label>
+            <input type="date" id="hasta" name="Hasta" value="@Model.Hasta?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="insuseg-field">
+            <label for="vendedor">Vendedor</label>
+            <select id="vendedor" name="VendedorCodigo">
+                <option value="">Todos los vendedores</option>
+                @foreach (var v in Model.Vendedores)
+                {
+                    <option value="@v.Codigo" selected="@(Model.VendedorCodigo == v.Codigo ? "selected" : null)">@v.Nombre</option>
+                }
+            </select>
+        </div>
+        <button type="submit" class="insuseg-btn">Aplicar</button>
+    </form>
+
+    <div class="insuseg-kpi-row">
+        <div class="insuseg-kpi">
+            <div class="insuseg-kpi-label">Venta total del período</div>
+            <div class="insuseg-kpi-value">$@Model.VentaTotalPeriodo.ToString("N0")</div>
+            <div class="insuseg-kpi-label" style="margin-top:0.6rem">Margen total del período</div>
+            <div class="insuseg-kpi-value">$@Model.MargenTotalPeriodo.ToString("N0")</div>
+            <div class="insuseg-kpi-highlight">@Model.PorcentajeMargenPeriodo.ToString("N1") % Mg</div>
+        </div>
+        <div class="insuseg-kpi">
+            <div class="insuseg-kpi-label">Venta promedio por mes</div>
+            <div class="insuseg-kpi-value">$@Model.VentaPromedioMes.ToString("N0")</div>
+            <div class="insuseg-kpi-sub">excluye @(Model.MesActual?.Etiqueta ?? "—") (mes en curso)</div>
+        </div>
+        <div class="insuseg-kpi">
+            <div class="insuseg-kpi-label">Venta del mes actual (@(Model.MesActual?.Etiqueta ?? "—"))</div>
+            <div class="insuseg-kpi-value">$@Model.VentaMesActual.ToString("N0")</div>
+        </div>
+        <div class="insuseg-kpi">
+            <div class="insuseg-kpi-label">Margen del mes actual (@(Model.MesActual?.Etiqueta ?? "—"))</div>
+            <div class="insuseg-kpi-value">$@Model.MargenMesActual.ToString("N0")</div>
+            <div class="insuseg-kpi-highlight">@Model.PorcentajeMargenMesActual.ToString("N1") % Mg</div>
+        </div>
+        <div class="insuseg-kpi @(Model.DiferenciaAnioAnterior > 0 ? "kpi-bad" : "kpi-good")">
+            <div class="insuseg-kpi-label">Comparado con @(Model.MesAnioAnteriorEtiqueta ?? "—") (año anterior)</div>
+            <div class="insuseg-kpi-value">
+                @(Model.DiferenciaAnioAnterior > 0
+                    ? $"Faltan ${Model.DiferenciaAnioAnterior.ToString("N0")}"
+                    : $"Superado por ${Math.Abs(Model.DiferenciaAnioAnterior).ToString("N0")}")
+            </div>
+            <div class="insuseg-kpi-sub">$@Model.VentaMesAnioAnterior.ToString("N0") vendido en @(Model.MesAnioAnteriorEtiqueta ?? "—")</div>
+        </div>
+    </div>
+
+    <div class="insuseg-card">
+        <h2 style="margin-top:0">Tendencia de ventas netas por mes</h2>
+        @if (coordsTendencia.Count == 0)
+        {
+            <p>No hay ventas en el período seleccionado.</p>
+        }
+        else
+        {
+            <div class="viz-tendencia" data-puntos='@puntosTendenciaJson'>
+                <svg viewBox="0 0 @F(anchoSvg) @F(altoSvg)" class="viz-svg" role="img" aria-label="Tendencia de ventas netas por mes">
+                    <line x1="@F(padIzq)" y1="@F(padSup + altoUtilSvg)" x2="@F(anchoSvg - padDer)" y2="@F(padSup + altoUtilSvg)" class="viz-baseline" />
+                    <path d="@areaPathTendencia" class="viz-area"></path>
+                    <path d="@lineaPathTendencia" class="viz-linea"></path>
+                    @foreach (var c in coordsTendencia)
+                    {
+                        <circle cx="@F(c.X)" cy="@F(c.Y)" r="4.5" class="viz-punto"></circle>
+                    }
+                    <text x="@F(coordsTendencia[^1].X)" y="@F(Math.Max(coordsTendencia[^1].Y - 10, 10))" class="viz-etiqueta-valor" text-anchor="end">$@coordsTendencia[^1].Monto.ToString("N0")</text>
+                    <line class="viz-crosshair" x1="0" y1="@F(padSup)" x2="0" y2="@F(padSup + altoUtilSvg)" style="display:none"></line>
+                    <circle class="viz-crosshair-punto" r="5.5" style="display:none"></circle>
+                </svg>
+                <div class="viz-tooltip" style="display:none"></div>
+                <div class="viz-eje-x">
+                    @for (var i = 0; i < coordsTendencia.Count; i++)
+                    {
+                        var mostrarEtiqueta = i % pasoEtiquetaTendencia == 0 || i == coordsTendencia.Count - 1;
+                        <span style="left:@(F(coordsTendencia[i].X / anchoSvg * 100))%">@(mostrarEtiqueta ? coordsTendencia[i].Etiqueta : "")</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="insuseg-card">
+        <h2 style="margin-top:0">Margen por mes</h2>
+        @if (Model.MargenMensual.Count == 0)
+        {
+            <p>No hay ventas en el período seleccionado.</p>
+        }
+        else
+        {
+            var maxMargenMensual = Model.MargenMensual.Max(m => m.Monto);
+            var mesDestacado = Model.MargenMensual.OrderByDescending(m => m.Monto).First().Etiqueta;
+            <p class="detalle-nota">
+                Margen neto (venta − costo) por mes del período filtrado. La altura de la barra es el monto;
+                el <strong>% Mg</strong> arriba es margen ÷ venta neta de ese mes.
+            </p>
+            <div class="margen-chart-scroll">
+                <div class="margen-chart">
+                    @foreach (var m in Model.MargenMensual)
+                    {
+                        var alturaPct = maxMargenMensual > 0 ? (double)(m.Monto / maxMargenMensual) * 100 : 0;
+                        <div class="margen-barra-col @(m.Etiqueta == mesDestacado ? "destacada" : "")" title="@(m.Etiqueta): @m.PorcentajeMargen.ToString("N1") % Mg ($@m.Monto.ToString("N0"))">
+                            <div class="margen-pct">@m.PorcentajeMargen.ToString("N1") % Mg</div>
+                            <div class="margen-valor">$@((m.Monto / 1000).ToString("N0"))k</div>
+                            <div class="margen-barra" style="height:@(alturaPct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                        </div>
+                    }
+                </div>
+                <div class="margen-eje-x">
+                    @foreach (var m in Model.MargenMensual)
+                    {
+                        <span>@m.Etiqueta</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="insuseg-card">
+        <h2 style="margin-top:0">Ventas por cliente</h2>
+        <p class="detalle-nota">
+            Todos los montos son netos (sin IVA).
+            <strong>Peso Cliente</strong> = monto del cliente ÷ total de todos los clientes del período filtrado.
+            <strong>% Cartera</strong> = monto del cliente ÷ total de su vendedor asignado (chip junto al nombre) en el período.
+        </p>
+        @if (Model.Clientes.Count == 0)
+        {
+            <p>No hay ventas en el período seleccionado.</p>
+        }
+        else
+        {
+            <div class="tabla-scroll tabla-vertical-limitada">
+                <table class="insuseg-table" id="tabla-cartera">
+                    <thead>
+                        <tr>
+                            <th class="col-sticky col-sticky-1">N°</th>
+                            <th class="col-sticky col-sticky-2">Cliente</th>
+                            @foreach (var mes in Model.Meses)
+                            {
+                                <th>@mes.Etiqueta</th>
+                            }
+                            <th class="col-total">Total general</th>
+                            <th class="col-calc">Promedio Mes</th>
+                            <th class="col-calc">Peso Cliente</th>
+                            <th class="col-calc">% Cartera</th>
+                            <th class="col-calc">% MG</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ var n = 0; }
+                        @foreach (var c in Model.Clientes)
+                        {
+                            n++;
+                            <tr class="fila-cliente" data-card-code="@c.CardCode">
+                                <td class="col-sticky col-sticky-1">@n</td>
+                                <td class="col-sticky col-sticky-2">
+                                    <div class="nombre-cliente">
+                                        <span class="chevron">▶</span>
+                                        <span class="nombre-cliente-texto">@c.CardName</span>
+                                        <span class="chip-vendedor">@c.Vendedor</span>
+                                    </div>
+                                </td>
+                                @foreach (var mes in Model.Meses)
+                                {
+                                    var monto = c.MontoPorMes.GetValueOrDefault((mes.Anio, mes.Mes));
+                                    <td>@(monto == 0 ? "—" : monto.ToString("N0"))</td>
+                                }
+                                <td class="col-total">@c.TotalGeneral.ToString("N0")</td>
+                                <td class="col-calc">@c.PromedioMes.ToString("N0")</td>
+                                <td class="col-calc">@c.PesoCliente.ToString("N0")%</td>
+                                <td class="col-calc">@c.PorcentajeCartera.ToString("N0")%</td>
+                                <td class="col-mg">@c.PorcentajeMargen.ToString("N0")%</td>
+                            </tr>
+                            <tr class="fila-detalle" data-detalle-de="@c.CardCode">
+                                <td colspan="@colspanDetalle"></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="nota-sin-limite">@Model.Clientes.Count cliente(s) con ventas en el período filtrado — sin límite superior de filas.</p>
+        }
+    </div>
+</div>
+
+<script src="~/js/tendencia.js"></script>
+<script src="~/js/cartera.js"></script>

@@ -1,0 +1,63 @@
+@page
+@model Insuseg.Analytics.Api.Pages.Ventas.SincronizacionModel
+@{
+    ViewData["Title"] = "Sincronización";
+}
+<div class="insuseg-container">
+    <h1>Sincronización de ventas</h1>
+
+    @if (!string.IsNullOrEmpty(Model.SyncSummary))
+    {
+        <div class="insuseg-summary">✅ @Model.SyncSummary</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.SyncError))
+    {
+        <div class="insuseg-error">⚠️ @Model.SyncError</div>
+    }
+
+    <div class="insuseg-card">
+        <form method="post" asp-page-handler="Sync">
+            <button type="submit" class="insuseg-btn">Sincronizar ahora</button>
+            <span style="margin-left:0.75rem; color:#696969; font-size:0.9rem;">
+                Trae las ventas nuevas desde SAP y las guarda en la base — puede tardar unos segundos.
+            </span>
+        </form>
+        <form method="post" asp-page-handler="FullResync" style="margin-top:0.75rem">
+            <button type="submit" class="insuseg-btn-link">Reprocesar historial completo</button>
+            <span style="margin-left:0.75rem; color:#696969; font-size:0.9rem;">
+                Acción puntual: vuelve a traer todo el historial (no solo lo nuevo) para completar el detalle
+                de líneas de órdenes viejas — necesario una sola vez para que el módulo de Inventario tenga
+                datos de rotación.
+            </span>
+        </form>
+    </div>
+
+    <div class="insuseg-card">
+        <h2 style="margin-top:0">Últimas @Model.Sales.Count ventas guardadas</h2>
+        <table class="insuseg-table">
+            <thead>
+                <tr>
+                    <th>Cliente</th>
+                    <th>Código</th>
+                    <th>Monto</th>
+                    <th>Fecha</th>
+                    <th>Vendedor</th>
+                    <th>Fuente</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var sale in Model.Sales)
+                {
+                    <tr>
+                        <td>@sale.CardName</td>
+                        <td>@sale.CardCode</td>
+                        <td>@sale.Amount.ToString("N0")</td>
+                        <td>@sale.SaleDate.ToString("yyyy-MM-dd")</td>
+                        <td>@(sale.SalesPersonName ?? "—")</td>
+                        <td>@sale.SourceDocType</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

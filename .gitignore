@@ -1,0 +1,17 @@
+## .NET / Visual Studio
+bin/
+obj/
+*.user
+.vs/
+
+## Archivos de sistema / herramientas locales, no del proyecto
+.849C9593-D756-4E56-8D6E-42412F2A707B
+.claude/
+.config/
+
+## Azure Functions local
+local.settings.json
+
+## Secretos / passwords locales (ver reglas de seguridad en Insuseg.md)
+*.pfx
+secrets.json

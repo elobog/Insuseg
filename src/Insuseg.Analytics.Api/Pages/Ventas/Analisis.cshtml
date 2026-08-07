@@ -1,0 +1,213 @@
+@page
+@model Insuseg.Analytics.Api.Pages.Ventas.AnalisisModel
+@{
+    ViewData["Title"] = "Análisis de ventas";
+    var maxCliente = Model.VentasPorCliente.Count > 0 ? Model.VentasPorCliente.Max(c => c.Monto) : 0m;
+    var maxVendedor = Model.VentasPorVendedor.Count > 0 ? Model.VentasPorVendedor.Max(v => v.Monto) : 0m;
+    var costoTotal = Model.TotalVendido - Model.MargenTotal;
+    var margenPct = Model.TotalVendido > 0 ? (double)(Model.MargenTotal / Model.TotalVendido) * 100 : 0;
+    var costoPct = Model.TotalVendido > 0 ? 100 - margenPct : 0;
+}
+<div class="insuseg-container">
+    <h1>Análisis de ventas</h1>
+    <p class="insuseg-subtitle">Todos los montos son netos (sin IVA).</p>
+
+    <form method="get" class="insuseg-filters">
+        <div class="insuseg-field">
+            <label for="desde">Desde</label>
+            <input type="date" id="desde" name="Desde" value="@Model.Desde?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="insuseg-field">
+            <label for="hasta">Hasta</label>
+            <input type="date" id="hasta" name="Hasta" value="@Model.Hasta?.ToString("yyyy-MM-dd")" />
+        </div>
+        <button type="submit" class="insuseg-btn">Aplicar</button>
+    </form>
+
+    <div class="insuseg-kpi-row">
+        <div class="insuseg-kpi">
+            <div class="insuseg-kpi-label">Total vendido en el período</div>
+            <div class="insuseg-kpi-value">$@Model.TotalVendido.ToString("N0")</div>
+        </div>
+        <div class="insuseg-kpi">
+            <div class="insuseg-kpi-label">Órdenes en el período</div>
+            <div class="insuseg-kpi-value">@Model.CantidadOrdenes</div>
+        </div>
+        <div class="insuseg-kpi">
+            <div class="insuseg-kpi-label">Cliente top</div>
+            <div class="insuseg-kpi-value" style="font-size:1.1rem">@(Model.ClienteTop?.CardName ?? "—")</div>
+            @if (Model.ClienteTop is not null)
+            {
+                <div class="insuseg-kpi-sub">$@Model.ClienteTop.Monto.ToString("N0")</div>
+            }
+        </div>
+        <div class="insuseg-kpi">
+            <div class="insuseg-kpi-label">Vendedor top</div>
+            <div class="insuseg-kpi-value" style="font-size:1.1rem">@(Model.VendedorTop?.Nombre ?? "—")</div>
+            @if (Model.VendedorTop is not null)
+            {
+                <div class="insuseg-kpi-sub">$@Model.VendedorTop.Monto.ToString("N0") (@Model.VendedorTop.PorcentajeDelTotal.ToString("N0")% del total)</div>
+            }
+        </div>
+        <div class="insuseg-kpi">
+            <div class="insuseg-kpi-label">Margen total</div>
+            <div class="insuseg-kpi-value">$@Model.MargenTotal.ToString("N0")</div>
+            <div class="insuseg-kpi-sub">@Model.PorcentajeMargenPromedio.ToString("N1")% del total vendido</div>
+        </div>
+    </div>
+
+    <div class="insuseg-card">
+        <h2 style="margin-top:0">Composición del total vendido</h2>
+        @if (Model.TotalVendido <= 0)
+        {
+            <p>No hay ventas en el período seleccionado.</p>
+        }
+        else
+        {
+            <div class="viz-stack" role="img" aria-label="Margen @margenPct.ToString("N0")% y costo @costoPct.ToString("N0")% del total vendido">
+                <div class="viz-stack-seg viz-stack-margen" style="width:@margenPct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%" title="Margen: $@Model.MargenTotal.ToString("N0") (@margenPct.ToString("N0")%)">
+                    @if (margenPct >= 12)
+                    {
+                        <span>Margen $@Model.MargenTotal.ToString("N0") (@margenPct.ToString("N0")%)</span>
+                    }
+                </div>
+                <div class="viz-stack-seg viz-stack-costo" style="width:@costoPct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%" title="Costo: $@costoTotal.ToString("N0") (@costoPct.ToString("N0")%)">
+                    @if (costoPct >= 12)
+                    {
+                        <span>Costo $@costoTotal.ToString("N0") (@costoPct.ToString("N0")%)</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="insuseg-charts-grid">
+        <div class="insuseg-card">
+            <h2 style="margin-top:0">Ventas por cliente</h2>
+            @if (Model.VentasPorCliente.Count == 0)
+            {
+                <p>No hay ventas en el período seleccionado.</p>
+            }
+            else
+            {
+                <div class="insuseg-barchart">
+                    @foreach (var c in Model.VentasPorCliente)
+                    {
+                        var pct = maxCliente > 0 ? (double)(c.Monto / maxCliente) * 100 : 0;
+                        <div class="insuseg-bar-row" title="@c.CardName: $@c.Monto.ToString("N0") (@c.Cantidad órdenes)">
+                            <span class="insuseg-bar-label">@c.CardName</span>
+                            <div class="insuseg-bar-track"><div class="insuseg-bar-fill" style="width:@(pct.ToString("F1"))%"></div></div>
+                            <span class="insuseg-bar-value">$@c.Monto.ToString("N0")</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="insuseg-card">
+            <h2 style="margin-top:0">Ventas por vendedor</h2>
+            @if (Model.VentasPorVendedor.Count == 0)
+            {
+                <p>No hay ventas en el período seleccionado.</p>
+            }
+            else
+            {
+                <div class="insuseg-barchart">
+                    @foreach (var v in Model.VentasPorVendedor)
+                    {
+                        var pct = maxVendedor > 0 ? (double)(v.Monto / maxVendedor) * 100 : 0;
+                        <div class="insuseg-bar-row" title="@v.Nombre: $@v.Monto.ToString("N0") (@v.PorcentajeDelTotal.ToString("N1")% del total, @v.Cantidad órdenes)">
+                            <span class="insuseg-bar-label">@v.Nombre</span>
+                            <div class="insuseg-bar-track"><div class="insuseg-bar-fill" style="width:@(pct.ToString("F1"))%"></div></div>
+                            <span class="insuseg-bar-value">$@v.Monto.ToString("N0")</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="insuseg-card">
+        <h2 style="margin-top:0">Clientes desatendidos</h2>
+        <p style="color:#696969; font-size:0.9rem; margin-top:-0.5rem">
+            Clientes que compraron antes, pero no en los últimos 60 días (no depende del filtro de fecha de arriba —
+            se calcula sobre todo el historial). Ordenado por lo que representaban históricamente, para priorizar.
+        </p>
+        @if (Model.ClientesDesatendidos.Count == 0)
+        {
+            <p>No hay clientes desatendidos — todos compraron en los últimos 60 días.</p>
+        }
+        else
+        {
+            <div class="tabla-vertical-limitada">
+                <table class="insuseg-table">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Vendedor responsable</th>
+                            <th>Última compra</th>
+                            <th>Días sin comprar</th>
+                            <th>Monto histórico</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in Model.ClientesDesatendidos)
+                        {
+                            <tr>
+                                <td>@c.CardName</td>
+                                <td>@c.Vendedor</td>
+                                <td>@c.UltimaCompra.ToString("yyyy-MM-dd")</td>
+                                <td>@c.DiasSinComprar</td>
+                                <td>$@c.MontoHistorico.ToString("N0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="insuseg-card">
+        <h2 style="margin-top:0">Margen por producto</h2>
+        <p style="color:#696969; font-size:0.9rem; margin-top:-0.5rem">
+            Top 20 productos por margen (venta − costo) en el período filtrado. Costo tomado de
+            <code>GrossBuyPrice</code> de SAP (confiable), no de la ficha del producto.
+        </p>
+        @if (Model.MargenPorProducto.Count == 0)
+        {
+            <p>No hay ventas en el período seleccionado.</p>
+        }
+        else
+        {
+            <div class="tabla-vertical-limitada">
+                <table class="insuseg-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Unidades</th>
+                            <th>Vendido</th>
+                            <th>Costo</th>
+                            <th>Margen</th>
+                            <th>% Margen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.MargenPorProducto)
+                        {
+                            <tr>
+                                <td>@p.ItemCode</td>
+                                <td>@p.ItemName</td>
+                                <td>@p.Unidades.ToString("N0")</td>
+                                <td>$@p.Vendido.ToString("N0")</td>
+                                <td>$@p.Costo.ToString("N0")</td>
+                                <td>$@p.Margen.ToString("N0")</td>
+                                <td>@p.PorcentajeMargen.ToString("N1")%</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

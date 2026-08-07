@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Insuseg.Analytics.Api/Insuseg.Analytics.Api.csproj" />
+    <Project Path="src/Insuseg.Analytics.Data/Insuseg.Analytics.Data.csproj" />
+    <Project Path="src/Insuseg.Analytics.Ingestion/Insuseg.Analytics.Ingestion.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,77 @@
+@page
+@model Insuseg.Analytics.Api.Pages.Administracion.UsuariosModel
+@{
+    ViewData["Title"] = "Usuarios";
+}
+<div class="insuseg-container">
+    <h1>Usuarios</h1>
+
+    @if (!string.IsNullOrEmpty(Model.InviteSummary))
+    {
+        <div class="insuseg-summary">✅ @Model.InviteSummary</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.InviteError))
+    {
+        <div class="insuseg-error">⚠️ @Model.InviteError</div>
+    }
+
+    <div class="insuseg-card">
+        <h2 style="margin-top:0">@Model.Usuarios.Count usuarios con acceso al dashboard</h2>
+        <div class="tabla-vertical-limitada">
+            <table class="insuseg-table">
+                <thead>
+                    <tr>
+                        <th>Correo</th>
+                        <th>Rol</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var usuario in Model.Usuarios)
+                    {
+                        <tr>
+                            <td>@usuario.Email</td>
+                            <td>@(string.IsNullOrEmpty(usuario.Roles) ? "(sin rol)" : usuario.Roles)</td>
+                            <td>
+                                <form method="post" asp-page-handler="Eliminar"
+                                      onsubmit="return confirm('¿Eliminar la cuenta de @usuario.Email?');">
+                                    <input type="hidden" name="userId" value="@usuario.Id" />
+                                    <button type="submit" class="insuseg-btn-link">Eliminar</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="insuseg-card">
+        <h2 style="margin-top:0">Invitar usuario nuevo</h2>
+        <p style="color:#696969; font-size:0.9rem; margin-top:-0.5rem">
+            La contraseña se define acá y se le pasa a la persona por fuera del sistema (no hay envío de
+            correo configurado).
+        </p>
+        <form method="post" asp-page-handler="Invitar">
+            <div class="insuseg-field">
+                <label for="email">Correo</label>
+                <input type="email" id="email" asp-for="NuevoEmail" required />
+            </div>
+            <div class="insuseg-field">
+                <label for="password">Contraseña inicial</label>
+                <input type="password" id="password" asp-for="NuevaPassword" required />
+            </div>
+            <div class="insuseg-field">
+                <label for="rol">Rol</label>
+                <select id="rol" asp-for="NuevoRol" required>
+                    <option value="">Elegir rol...</option>
+                    @foreach (var rol in Insuseg.Analytics.Api.Pages.Administracion.UsuariosModel.RolesDisponibles)
+                    {
+                        <option value="@rol">@rol</option>
+                    }
+                </select>
+            </div>
+            <button type="submit" class="insuseg-btn">Crear usuario</button>
+        </form>
+    </div>
+</div>
