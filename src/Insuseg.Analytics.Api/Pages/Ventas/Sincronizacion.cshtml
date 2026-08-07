@@ -26,8 +26,14 @@
             <button type="submit" class="insuseg-btn-link">Reprocesar historial completo</button>
             <span style="margin-left:0.75rem; color:#696969; font-size:0.9rem;">
                 Acción puntual: vuelve a traer todo el historial (no solo lo nuevo) para completar el detalle
-                de líneas de órdenes viejas — necesario una sola vez para que el módulo de Inventario tenga
-                datos de rotación.
+                de líneas de órdenes viejas.
+            </span>
+        </form>
+        <form method="post" asp-page-handler="SyncProductos" style="margin-top:0.75rem">
+            <button type="submit" class="insuseg-btn-link">Sincronizar productos</button>
+            <span style="margin-left:0.75rem; color:#696969; font-size:0.9rem;">
+                Trae el catálogo de productos desde SAP (nombre, stock) — hace falta para que el detalle por
+                producto de Cartera de clientes muestre el nombre de los productos nuevos.
             </span>
         </form>
     </div>

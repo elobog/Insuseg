@@ -4,6 +4,7 @@ using Insuseg.Analytics.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Insuseg.Analytics.Data.Migrations
 {
     [DbContext(typeof(InsusegAnalyticsDbContext))]
-    partial class InsusegAnalyticsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260807133027_RemovePurchases")]
+    partial class RemovePurchases
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

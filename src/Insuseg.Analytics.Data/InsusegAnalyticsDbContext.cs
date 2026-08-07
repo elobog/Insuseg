@@ -19,7 +19,6 @@ public class InsusegAnalyticsDbContext : IdentityDbContext<IdentityUser>
     public DbSet<SalesPerson> SalesPersons => Set<SalesPerson>();
     public DbSet<Item> Items => Set<Item>();
     public DbSet<SaleLine> SaleLines => Set<SaleLine>();
-    public DbSet<Purchase> Purchases => Set<Purchase>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -67,15 +66,6 @@ public class InsusegAnalyticsDbContext : IdentityDbContext<IdentityUser>
             entity.Property(l => l.Quantity).HasPrecision(18, 3);
             entity.Property(l => l.LineTotal).HasPrecision(18, 2);
             entity.Property(l => l.GrossBuyPrice).HasPrecision(18, 4);
-        });
-
-        modelBuilder.Entity<Purchase>(entity =>
-        {
-            entity.HasKey(p => p.DocEntry);
-            entity.Property(p => p.DocEntry).ValueGeneratedNever();
-            entity.Property(p => p.CardCode).HasMaxLength(15);
-            entity.Property(p => p.CardName).HasMaxLength(100);
-            entity.Property(p => p.Amount).HasPrecision(18, 2);
         });
     }
 }

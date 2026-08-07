@@ -7,5 +7,5 @@ namespace Insuseg.Analytics.Api.Pages;
 [Authorize(AuthenticationSchemes = "Identity.Application")]
 public class IndexModel : PageModel
 {
-    public IActionResult OnGet() => RedirectToPage("/Ventas/Analisis");
+    public IActionResult OnGet() => RedirectToPage("/Ventas/Cartera");
 }

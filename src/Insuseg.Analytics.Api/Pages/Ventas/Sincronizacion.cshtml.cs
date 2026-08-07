@@ -14,11 +14,14 @@ public class SincronizacionModel : PageModel
 {
     private readonly InsusegAnalyticsDbContext _db;
     private readonly SalesSyncService _syncService;
+    private readonly InventorySyncService _inventorySyncService;
 
-    public SincronizacionModel(InsusegAnalyticsDbContext db, SalesSyncService syncService)
+    public SincronizacionModel(
+        InsusegAnalyticsDbContext db, SalesSyncService syncService, InventorySyncService inventorySyncService)
     {
         _db = db;
         _syncService = syncService;
+        _inventorySyncService = inventorySyncService;
     }
 
     public List<SaleRow> Sales { get; set; } = [];
@@ -66,6 +69,24 @@ public class SincronizacionModel : PageModel
         catch (Exception ex)
         {
             SyncError = $"No se pudo reprocesar: {ex.Message}";
+        }
+
+        return RedirectToPage();
+    }
+
+    // Compras e Inventario como módulos se borraron (2026-08-07), pero el detalle por producto de
+    // Cartera todavía necesita el nombre de los ítems (tabla Items) — este botón se movió acá para
+    // seguir teniéndolo sin resucitar la página de Inventario entera.
+    public async Task<IActionResult> OnPostSyncProductosAsync(CancellationToken ct)
+    {
+        try
+        {
+            var result = await _inventorySyncService.SyncAsync(ct);
+            SyncSummary = $"{result.ItemCount} productos sincronizados.";
+        }
+        catch (Exception ex)
+        {
+            SyncError = $"No se pudo sincronizar productos: {ex.Message}";
         }
 
         return RedirectToPage();

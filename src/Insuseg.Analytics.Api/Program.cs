@@ -44,8 +44,11 @@ builder.Services
     .ValidateOnStart();
 builder.Services.AddScoped<SapServiceLayerClient>();
 builder.Services.AddScoped<SalesSyncService>();
+// Compras e Inventario como módulos se borraron (2026-08-07) para enfocar todo en Cartera de
+// clientes — InventorySyncService se queda igual, solo porque el detalle por producto de Cartera
+// necesita el nombre de los ítems (tabla Items), que solo este servicio actualiza. El botón que lo
+// dispara se movió a Ventas/Sincronización (ver Insuseg.md).
 builder.Services.AddScoped<InventorySyncService>();
-builder.Services.AddScoped<PurchaseSyncService>();
 
 var app = builder.Build();
 
