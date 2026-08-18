@@ -92,7 +92,27 @@ public class SapServiceLayerClient : IAsyncDisposable
         // SalesItem) para no ocultar stock real por un recorte de alcance apresurado.
         var filter = Uri.EscapeDataString("Valid eq 'tYES'");
         return await GetAllPagesAsync<SapItemDto>(
-            $"Items?$select=ItemCode,ItemName,ItemsGroupCode,QuantityOnStock,MovingAveragePrice&$filter={filter}&$orderby=ItemCode",
+            $"Items?$select=ItemCode,ItemName,ItemsGroupCode,QuantityOnStock,MovingAveragePrice,U_Categoria&$filter={filter}&$orderby=ItemCode",
+            ct);
+    }
+
+    // Catálogo de categorías de producto (tabla de usuario U_ZCAT) — Items.U_Categoria solo trae el
+    // código (Code acá), el nombre real vive solo en esta tabla. Ver BDhana.md sección 2.
+    public async Task<List<SapItemCategoryDto>> GetItemCategoriesAsync(CancellationToken ct)
+    {
+        await EnsureLoggedInAsync(ct);
+        return await GetAllPagesAsync<SapItemCategoryDto>("U_ZCAT?$select=Code,Name", ct);
+    }
+
+    // Guías de despacho SIN facturar (DocumentStatus abierto, no canceladas) — ver BDhana.md sección
+    // 8b. A propósito no se filtra por fecha: no nos interesa el historial, solo el estado actual, y
+    // "abiertas" ya acota el volumen (cientos, no miles) sin necesitar una ventana de tiempo.
+    public async Task<List<SapDeliveryNoteDto>> GetOpenDeliveryNotesAsync(CancellationToken ct)
+    {
+        await EnsureLoggedInAsync(ct);
+        var filter = Uri.EscapeDataString("DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'");
+        return await GetAllPagesAsync<SapDeliveryNoteDto>(
+            $"DeliveryNotes?$select=DocEntry,DocNum,DocDate,DocTotal,CardCode,CardName,SalesPersonCode,Comments,NumAtCard&$filter={filter}&$orderby=DocEntry",
             ct);
     }
 

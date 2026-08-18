@@ -19,4 +19,17 @@ public class SapDocumentLineDto
     // verificado que coincide exactamente con el campo custom U_MgenMont cuando este último está poblado
     // (no siempre lo está, por eso se usa GrossBuyPrice como fuente y no U_MgenMont).
     public decimal GrossBuyPrice { get; set; }
+
+    // "bost_Open"/"bost_Close" — estado de la línea, INDEPENDIENTE del DocumentStatus de la cabecera:
+    // un documento con DocumentStatus='bost_Open' solo garantiza que AL MENOS UNA línea sigue abierta,
+    // no que todas lo estén. Usado hoy solo por DeliveryNoteSyncService (ver ahí el porqué — hallazgo
+    // Insuseg.md 2026-08-16, confirmado contra SAP real: 57% de las guías abiertas de la muestra tenían
+    // líneas ya facturadas mezcladas con líneas realmente pendientes bajo la misma cabecera "abierta").
+    public string? LineStatus { get; set; }
+
+    // Vendedor de ESTA línea — puede diferir del vendedor de la cabecera (ver BDhana.md sección 4:
+    // "SalesPersonCode (puede diferir del header, por línea)"). Usado hoy solo por
+    // DeliveryNoteSyncService: el modelo de "Guías" agrupa/filtra por vendedor de línea, no de
+    // cabecera, para no atribuirle a un vendedor una línea que en SAP quedó asignada a otro.
+    public int? SalesPersonCode { get; set; }
 }
