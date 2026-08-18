@@ -17,12 +17,18 @@
 
     <div class="insuseg-card">
         <h2 style="margin-top:0">@Model.Usuarios.Count usuarios con acceso al dashboard</h2>
+        <p class="detalle-nota">
+            Un usuario con rol <strong>Vendedor</strong> solo ve, en Cartera de clientes, los clientes de
+            <strong>su</strong> vendedor asignado acá — no elige vendedor, no hay filtro para él. Sin un
+            vendedor asignado, su Cartera queda vacía (con un aviso) hasta que se le asigne uno.
+        </p>
         <div class="tabla-vertical-limitada">
             <table class="insuseg-table">
                 <thead>
                     <tr>
                         <th>Correo</th>
                         <th>Rol</th>
+                        <th>Vendedor asignado</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -32,6 +38,26 @@
                         <tr>
                             <td>@usuario.Email</td>
                             <td>@(string.IsNullOrEmpty(usuario.Roles) ? "(sin rol)" : usuario.Roles)</td>
+                            <td>
+                                @if (usuario.EsVendedor)
+                                {
+                                    <form method="post" asp-page-handler="AsignarVendedor" class="form-asignar-vendedor">
+                                        <input type="hidden" name="userId" value="@usuario.Id" />
+                                        <select name="salesPersonCode">
+                                            <option value="">Sin asignar</option>
+                                            @foreach (var v in Model.Vendedores)
+                                            {
+                                                <option value="@v.Codigo" selected="@(usuario.SalesPersonCode == v.Codigo ? "selected" : null)">@v.Nombre</option>
+                                            }
+                                        </select>
+                                        <button type="submit" class="insuseg-btn-link">Guardar</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="detalle-nota" style="margin:0">— (no aplica, no es Vendedor)</span>
+                                }
+                            </td>
                             <td>
                                 <form method="post" asp-page-handler="Eliminar"
                                       onsubmit="return confirm('¿Eliminar la cuenta de @usuario.Email?');">
@@ -71,7 +97,28 @@
                     }
                 </select>
             </div>
+            <div class="insuseg-field" id="campo-vendedor" style="display:none">
+                <label for="vendedorCodigo">Vendedor asignado (solo para rol Vendedor)</label>
+                <select id="vendedorCodigo" asp-for="NuevoVendedorCodigo">
+                    <option value="">Sin asignar (se puede asignar después)</option>
+                    @foreach (var v in Model.Vendedores)
+                    {
+                        <option value="@v.Codigo">@v.Nombre</option>
+                    }
+                </select>
+            </div>
             <button type="submit" class="insuseg-btn">Crear usuario</button>
         </form>
     </div>
 </div>
+<script>
+    (function () {
+        var rol = document.getElementById('rol');
+        var campoVendedor = document.getElementById('campo-vendedor');
+        function actualizar() {
+            campoVendedor.style.display = rol.value === 'Vendedor' ? '' : 'none';
+        }
+        rol.addEventListener('change', actualizar);
+        actualizar();
+    })();
+</script>
