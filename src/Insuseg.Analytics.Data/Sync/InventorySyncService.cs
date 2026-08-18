@@ -27,11 +27,39 @@ public class InventorySyncService
     {
         _logger.LogInformation("Iniciando sincronización de inventario (Items) desde el Service Layer de SAP.");
 
+        // Categorías primero: Items.U_Categoria solo trae el código, así que el nombre ya tiene que
+        // estar disponible en la tabla local antes/independiente de sincronizar Items (no hay una
+        // dependencia estricta de orden a nivel de base — Item.CategoryCode no tiene FK — pero mantiene
+        // la corrida coherente si algo falla a mitad de camino).
+        var categorias = await _sapClient.GetItemCategoriesAsync(ct);
+        await UpsertCategoriesAsync(categorias, ct);
+
         var items = await _sapClient.GetItemsAsync(ct);
         await UpsertItemsAsync(items, ct);
 
-        _logger.LogInformation("Sincronización de inventario completa: {ItemCount} productos.", items.Count);
-        return new InventorySyncResult { ItemCount = items.Count };
+        _logger.LogInformation(
+            "Sincronización de inventario completa: {ItemCount} productos, {CategoryCount} categorías.",
+            items.Count, categorias.Count);
+        return new InventorySyncResult { ItemCount = items.Count, CategoryCount = categorias.Count };
+    }
+
+    private async Task UpsertCategoriesAsync(IReadOnlyList<SapItemCategoryDto> categorias, CancellationToken ct)
+    {
+        var existing = await _db.ItemCategories.ToDictionaryAsync(c => c.Code, ct);
+
+        foreach (var dto in categorias)
+        {
+            if (existing.TryGetValue(dto.Code, out var entity))
+            {
+                entity.Name = dto.Name;
+            }
+            else
+            {
+                _db.ItemCategories.Add(new ItemCategory { Code = dto.Code, Name = dto.Name });
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
     }
 
     private async Task UpsertItemsAsync(IReadOnlyList<SapItemDto> items, CancellationToken ct)
@@ -46,6 +74,7 @@ public class InventorySyncService
                 entity.ItemsGroupCode = dto.ItemsGroupCode;
                 entity.QuantityOnStock = dto.QuantityOnStock;
                 entity.MovingAveragePrice = dto.MovingAveragePrice;
+                entity.CategoryCode = dto.U_Categoria;
             }
             else
             {
@@ -56,6 +85,7 @@ public class InventorySyncService
                     ItemsGroupCode = dto.ItemsGroupCode,
                     QuantityOnStock = dto.QuantityOnStock,
                     MovingAveragePrice = dto.MovingAveragePrice,
+                    CategoryCode = dto.U_Categoria,
                 });
             }
         }

@@ -5,4 +5,5 @@ namespace Insuseg.Analytics.Data.Sync;
 public class InventorySyncResult
 {
     public required int ItemCount { get; init; }
+    public required int CategoryCount { get; init; }
 }
