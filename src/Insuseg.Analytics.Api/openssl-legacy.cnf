@@ -1,0 +1,20 @@
+# Config de OpenSSL propia de esta app (Linux App Service) — el SAP B1 Service Layer solo acepta
+# TLS 1.0 (ver Insuseg.md sección 4), y el OpenSSL 3.x del contenedor Linux de Azure lo bloquea a
+# nivel de política de seguridad del sistema (SECLEVEL), sin importar que SapServiceLayerClient ya
+# fuerza SslProtocols.Tls explícitamente en el código — .NET pide TLS 1.0, pero OpenSSL lo rechaza
+# antes de que la petición llegue a negociarse (error "no protocols available").
+#
+# Referenciada vía la variable de entorno OPENSSL_CONF (App Setting), NO se toca la config global del
+# sistema operativo — solo afecta las conexiones TLS que haga este proceso. Local (Windows/Schannel)
+# no necesita esto, se ignora ahí.
+openssl_conf = default_conf
+
+[default_conf]
+ssl_conf = ssl_sect
+
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+MinProtocol = TLSv1
+CipherString = DEFAULT@SECLEVEL=0

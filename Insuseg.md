@@ -4,6 +4,8 @@
 
 Aplicación de analítica (ventas, compras, clientes, productos, vendedores, órdenes, stock) que lee datos de **SAP Business One edición HANA** (producción) y los expone en reportes/dashboards, corriendo sobre infraestructura **gratuita de Azure**.
 
+**Equipo:** Eric y Ignacio — cada uno trabaja desde su propia máquina, sobre la misma carpeta de proyecto sincronizada por OneDrive (ver hallazgo operativo sobre `git` en sección 7). Cuando este archivo dice "el usuario" en secciones históricas anteriores a esta nota, se refiere a Eric.
+
 ## 2. Decisiones de arquitectura
 
 | Decisión | Elección | Motivo |
@@ -69,11 +71,197 @@ Suscripción: **Insuseg** (`d811fd57-192a-45fc-954d-be2e3224b3ba`), tenant `Meli
 
 ## 7. Pendientes / próximos pasos
 
-> **Siguiente paso al retomar (fin de sesión 2026-08-07):** la app se recortó a propósito a **solo `Ventas → Cartera de clientes`** — Compras, Inventario y `Ventas/Análisis` se borraron por decisión explícita del usuario, para enfocar el trabajo ahí por ahora. **El proyecto ahora es un repo git** (no lo era antes) con un commit de respaldo con el estado completo previo al recorte — ver sección nueva más abajo para cómo recuperar cualquiera de esos módulos. No confundir esto con "se perdió funcionalidad": está todo en el historial de git, listo para reconstruirse cuando se retome.
+> **Siguiente paso al retomar (fin de sesión 2026-08-16):** el cliente entregó una tabla actualizada de "Total Guías" por vendedor (misma planilla que el 2026-08-14, valores nuevos — los montos cambiaron porque guías se van facturando/agregando día a día). Se corrió de nuevo la sincronización real de `DeliveryNotes` contra SAP (681 guías abiertas, 92 venta real — vía `DeliveryNoteSyncService`, la misma clase del botón "Sincronizar ahora", ejecutada desde un runner temporal por conveniencia) y se recalculó la fórmula validada el 2026-08-14 contra los valores nuevos. **Resultado: 6 de 7 vendedores calzan exacto** (antes 4 de 7, con $3,6M de diferencia total) — ver detalle abajo, "✅ Segunda validación". Solo queda Mariana Sánchez con $59.340 de diferencia, y esta vez **se identificó la línea exacta que la explica** (no es un misterio como el 2026-08-14): una guía de Laboratorios Saval con el comentario "INGRESO FALSO" que la fórmula excluye a propósito (por diseño, ver `EsMuestraOCambio`) pero que el cliente sí está contando en su tabla. Pendiente real: confirmar con el equipo de ventas si "INGRESO FALSO" debería contar como pendiente de facturar — si la respuesta es sí, hay que sacar `INGRESO FALSO` del patrón de exclusión (`DeliveryNoteSyncService.PatronNoVenta` e igual en el script de validación).
+
+> **Siguiente paso al retomar (fin de sesión 2026-08-14):** se validó contra una tabla de referencia real del cliente ("Total Guías" por vendedor) la fórmula de guías pendientes de facturar — ver "✅ Fórmula validada" más abajo. **4 de 7 vendedores calzan exacto**; quedan Carlos Cortés, Insuseg y Mariana Sánchez con ~$3.6M de diferencia total que no se pudo reconstruir desde SAP bajo ningún filtro probado (fecha, estado de línea, texto) — siguiente paso es validarlo directo con el equipo de ventas, no seguir ajustando parámetros en SAP. Aparte, se implementó y dejó documentado el sync de `DeliveryNotes` (ver sección más abajo) y se resolvió un conflicto real de trabajo en paralelo con Ignacio (`git` no instalado en esta máquina).
+
+> **Siguiente paso al retomar (fin de sesión 2026-08-08):** sesión larga, todo en `Ventas → Cartera de clientes` (el único módulo activo desde el recorte del 2026-08-07). Cuatro cosas nuevas, ver detalle en las secciones de abajo: (1) los dos gráficos ("Tendencia" y "Margen por mes") ahora tienen puntos de estado por mes comparando contra el año anterior; (2) el detalle por cliente pasó de mostrar productos directo a mostrar **categoría → producto** (dos niveles), lo que llevó a descubrir y modelar bien la tabla de categorías de SAP (`U_ZCAT`); (3) se encontraron y corrigieron **tres bugs reales distintos** de scroll en las tablas anidadas (no uno solo — cada intento de arreglo destapó el siguiente); (4) la tabla "Ventas por cliente" ahora tiene buscador y encabezados ordenables. Todo verificado en vivo con Playwright + credenciales reales (`elobog@Melirrepu.com`), no solo en teoría.
 >
-> **Pendiente de seguridad, real y con acción recomendada:** al armar el repo git se encontró que la contraseña de SAP Service Layer (`ADMI1`) estaba en texto plano en este archivo (línea vieja, de la sesión 2026-07-26) — ya se sacó del archivo y del historial de git (ver sección nueva más abajo), pero **el password en sí sigue siendo el mismo de 4 dígitos**. Esto ya estaba anotado como pendiente de comunicar al cliente (junto con el TLS 1.0 y el certificado autofirmado del servidor SAP, ver sección 4 y el checklist de hallazgos de seguridad más abajo); esta sesión solo lo hizo más urgente al confirmar que efectivamente había quedado escrito en texto plano en algún lado.
+> **Pendiente nuevo, real, no resuelto:** la sincronización de Inventario/categorías (`InventorySyncService`, botón "Sincronizar productos") se colgó **2 de 3 veces** esta sesión corriéndola fuera de la app (mismo servicio, sin tocar código de sync) — siempre a mitad de la paginación de `Items` (~25.000 productos, ~255 páginas), nunca en la parte de categorías (rápida, 29 filas). Confirmado con `netstat` que el proceso quedaba sin ninguna conexión de red activa (no es "lento", está realmente trabado) — no se identificó la causa exacta, pero encaja con la fragilidad ya documentada de este servidor (TLS 1.0, Apache viejo, ver sección 4). Cuando el usuario corrió el mismo botón desde el navegador, funcionó bien. Mitigación por ahora: si se cuelga, reintentar.
 >
-> Pendientes de sesiones anteriores, sin tocar: (1) el módulo de Compras (cuando se reconstruya) probablemente tiene el mismo problema de notas de crédito que tuvo Ventas — nunca investigado. (2) sigue pendiente comunicar al cliente el hallazgo de los 7 documentos con vendedor mal asignado en SAP (ver sesión 2026-08-02). (3) login del papá del usuario — cuenta real ya creada (`elobog@Melirrepu.com`), falta coordinar con él y probar que entra (`AllowAllIPs` del firewall ya no debería ser el problema). (4) Nada de esto está desplegado a Azure todavía, todo corre local con `dotnet run`. (5) El sync de Ventas (Facturas) tarda ~31 minutos por el volumen real (16.904 facturas) — si se vuelve un problema de UX, evaluar acotar los campos de `DocumentLines` que se piden a SAP. (6) El detalle por producto de Cartera (AJAX) sigue tardando ~6 segundos pese al índice en `Sales.SaleDate` — mejora real (antes ~9s) pero no resuelto del todo.
+> Pendientes de sesiones anteriores, sin tocar: (1) el módulo de Compras (cuando se reconstruya) probablemente tiene el mismo problema de notas de crédito que tuvo Ventas — nunca investigado. (2) sigue pendiente comunicar al cliente el hallazgo de los 7 documentos con vendedor mal asignado en SAP (ver sesión 2026-08-02). (3) login del papá del usuario — ya se probó y **funciona** (`elobog@Melirrepu.com`, usado esta sesión para verificar todo en vivo) — este pendiente queda cerrado. (4) Nada de esto está desplegado a Azure todavía, todo corre local con `dotnet run`. (5) El sync de Ventas (Facturas) tarda ~31 minutos por el volumen real (16.904 facturas) — si se vuelve un problema de UX, evaluar acotar los campos de `DocumentLines` que se piden a SAP. (6) El detalle por producto de Cartera (AJAX) sigue tardando ~6 segundos pese al índice en `Sales.SaleDate` — mejora real (antes ~9s) pero no resuelto del todo. Nota: el AJAX ahora trae *categorías* primero, no productos directo — puede haber cambiado el tiempo, no vuelto a medir.
+
+### 📋 Tarea asignada a Ignacio: sacar "INGRESO FALSO" del patrón de exclusión (pendiente desde 2026-08-16)
+
+**Quién la hace: Ignacio, no Eric/esta máquina.** Paso a paso completo para que la ejecute él mismo, tocando código por primera vez en esta máquina compartida por OneDrive:
+
+**0. Condición previa — no saltear:** confirmar primero con el equipo de ventas si "INGRESO FALSO" (guías de servicio de estampado sobre tela propia del cliente) debe contar como pendiente de facturar. Sin esa confirmación, no se debe tocar el código todavía. Contexto completo del hallazgo: ver "✅ Segunda validación" más abajo.
+
+**1. Instalar `git` en su máquina**, si todavía no lo tiene (pendiente de infraestructura ya documentado más abajo, sección del hallazgo 2026-08-14). Sin esto no puede versionar nada de forma segura.
+
+**2. Antes de tocar una sola línea, sincronizar y verificar que no hay trabajo a medias:**
+```powershell
+# Esperar a que OneDrive termine de sincronizar (ícono de OneDrive "al día", no "sincronizando")
+git status
+git log --oneline -5
+```
+Si `git status` muestra cambios sin comitear que él no hizo, o `git log` no coincide con lo esperado, **parar y avisar antes de seguir** — puede ser señal de que alguien más está trabajando en paralelo (el mismo problema que ya pasó el 2026-08-14, ver más abajo).
+
+**3. Avisar por chat antes de empezar:** "voy a modificar `DeliveryNoteSyncService.cs`, no toquen nada hasta que avise que ya comiteé" — para que nadie más edite código al mismo tiempo.
+
+**4. Hacer el cambio** — en `Insuseg.Analytics.Data/Sync/DeliveryNoteSyncService.cs`, línea del patrón `PatronNoVenta` (hoy línea 24), sacar `INGRESO FALSO|`:
+```csharp
+// Antes:
+"MUESTRA|CAMBIO|^LOGO|INGRESO FALSO|NO FACTURAR|DONACION|CALIDAD|CONSUMO",
+// Después:
+"MUESTRA|CAMBIO|^LOGO|NO FACTURAR|DONACION|CALIDAD|CONSUMO",
+```
+
+**5. Compilar:**
+```powershell
+dotnet build "Proyectos\src\Insuseg.Analytics.Api\Insuseg.Analytics.Api.csproj"
+```
+
+**6. Probar en vivo** — correr la app local y usar el botón real "Sincronizar ahora" en Ventas/Sincronización, confirmar que la guía de Laboratorios Saval ($59.340) ahora cuenta como venta real:
+```powershell
+dotnet run --project "Proyectos\src\Insuseg.Analytics.Api\Insuseg.Analytics.Api.csproj"
+```
+
+**7. Actualizar este mismo archivo (`Insuseg.md`)** — agregar una línea corta en esta sección diciendo qué cambió y cuándo (ej. "2026-08-XX: confirmado con ventas que INGRESO FALSO sí cuenta, se sacó del patrón de exclusión").
+
+**8. Comitear en un solo commit:**
+```powershell
+git add Proyectos\src\Insuseg.Analytics.Data\Sync\DeliveryNoteSyncService.cs Proyectos\Insuseg.md
+git commit -m "Sacar INGRESO FALSO del patron de exclusion de DeliveryNotes (confirmado con ventas)"
+```
+
+**9. Avisar por chat que ya comiteó** — recién ahí el resto del equipo puede volver a tocar código.
+
+No hace falta `git push`: el repo no tiene remoto configurado (todo local, sincronizado solo por OneDrive) — el commit ya queda disponible para el resto en cuanto OneDrive termine de subir/bajar los archivos del `.git`.
+
+### ✅ Segunda validación contra tabla actualizada del cliente: 6 de 7 vendedores exactos (2026-08-16)
+
+El cliente envió una foto nueva de la misma planilla ("Total Guías" por vendedor), con montos distintos a los del 2026-08-14 (es un estado vivo — guías se facturan y se agregan día a día, no es una corrección de la tabla anterior). Se aprovechó para: (1) refrescar `DeliveryNotes` en Azure SQL con la sincronización real de la app (`DeliveryNoteSyncService` — misma clase del botón "Sincronizar ahora" en Ventas/Sincronización, corrida desde un runner de consola temporal por conveniencia, sin agregar ningún endpoint nuevo) y (2) recalcular la fórmula validada el 2026-08-14 (líneas con `LineStatus='bost_Open'`, agrupadas por vendedor de línea, excluyendo muestra/cambio/etc por texto+monto) contra los DocumentLines reales de SAP con un script ad-hoc de solo lectura, igual que la vez anterior.
+
+**Tabla del cliente (2026-08-16):**
+
+| Vendedor | Total Guías (cliente) |
+|---|---|
+| Karihosqui Calderon | \$62.418.280 |
+| Insuseg | \$9.712.730 |
+| Carlos Cortes | \$3.798.020 |
+| Marcela Espinoza | \$2.575.070 |
+| Luz Lacruz | \$1.611.960 |
+| Mariana Sanchez | \$1.598.630 |
+| Florimar Rodriguez | \$60.640 |
+| **Total General** | **\$81.775.330** |
+
+**Resultado (fórmula vs. tabla del cliente):**
+
+| Vendedor | Calculado | Cliente | Diferencia |
+|---|---|---|---|
+| Karihosqui Calderon | \$62.418.280 | \$62.418.280 | exacto |
+| Insuseg | \$9.712.730 | \$9.712.730 | exacto |
+| Carlos Cortes | \$3.798.020 | \$3.798.020 | exacto |
+| Marcela Espinoza | \$2.575.070 | \$2.575.070 | exacto |
+| Luz Lacruz | \$1.611.960 | \$1.611.960 | exacto |
+| Florimar Rodriguez | \$60.640 | \$60.640 | exacto |
+| Mariana Sanchez | \$1.539.290 | \$1.598.630 | -\$59.340 |
+| **Total** | **\$81.715.990** | **\$81.775.330** | **-\$59.340 (0,07%)** |
+
+**Diferencia de Mariana Sánchez, explicada al 100% (a diferencia del 4,4% sin explicar del 2026-08-14):** una sola guía, doc `24824` (cliente Laboratorios Saval S.A.), línea de \$59.340, con el comentario textual *"CLIENTE LAS TRAJO SOLO PARA SERVICIO DE ESTAMPADO. NV PARA HACER GD DE TALLER. INGRESO FALSO DE LAS PARKAS"*. La fórmula la excluye a propósito porque matchea `INGRESO FALSO` en el patrón de no-venta (`DeliveryNoteSyncService.PatronNoVenta`) — el criterio asume que "ingreso falso" significa que no es venta real (el cliente trajo sus propias parkas solo para el servicio de estampado). El cliente, sin embargo, sí la está contando en su total. **No se cambió el código todavía** — antes de sacar `INGRESO FALSO` del patrón de exclusión (lo que también afectaría a cualquier otra guía con ese mismo comentario) hay que confirmar con el equipo de ventas si este tipo de caso (servicio de estampado sobre prenda propia del cliente) debe contar como pendiente de facturar o no.
+
+**Sincronización real ejecutada:** `DeliveryNoteSyncService.SyncAsync()` corrido contra la Azure SQL de producción (`sqldb-insuseg-analytics`) — 681 guías abiertas, 92 clasificadas como venta real, 0 removidas (nada se facturó/canceló desde el último sync). Mismo comportamiento que si se hubiera apretado el botón desde el navegador. El runner temporal (consola .NET referenciando `Insuseg.Analytics.Data` directamente, sin tocar la app) se creó y se borró en esta sesión, no quedó nada nuevo en el repo.
+
+### ✅ Fórmula validada contra tabla real del cliente: "Total Guías" por vendedor (2026-08-14)
+
+El usuario entregó una tabla real (foto de una planilla/reporte interno) con el total de guías pendientes de facturar por vendedor — 7 vendedores + total general \$81,328,355 — pedida para validar/corregir la lógica del hallazgo de arriba. Se hizo ingeniería inversa iterativa contra `INSUSEG` real hasta encontrar la fórmula:
+
+**Fórmula final:** `DeliveryNotes` abiertas y no canceladas → de esas, solo las **líneas** con `LineStatus = 'bost_Open'` (no las que ya se facturaron individualmente aunque el documento completo siga abierto por otra línea) → excluir por texto en `Comments`/`NumAtCard` (`MUESTRA`, `CAMBIO`, `LOGO`, `INGRESO FALSO`, `NO FACTURAR`, `DONACION`, `CALIDAD`, `CONSUMO`) + piso de \$1.000 → agrupar por el `SalesPersonCode` **de la línea**, no de la cabecera (puede diferir, ver `BDhana.md` sección 4) → **sin restricción de fecha** (se probó acotar a 2026 y a 2025+2026, dio peor resultado que no acotar nada).
+
+**Hallazgos en el camino:**
+- **`PickStatus`/`BackOrder` no sirven** — vienen con el mismo valor (`tNO`/`NotPicked`/`tYES`) en las 1.973 líneas revisadas; esta empresa no usa el módulo de Pick & Pack de SAP.
+- **`OpenAmount` (a nivel de línea) no es confiable en `DeliveryNotes`** — no se reduce a 0 cuando `LineStatus` pasa a `Closed`, sigue mostrando el `LineTotal` completo. El campo confiable es `LineStatus`, no `OpenAmount`.
+- **Bug real encontrado en la propia extracción:** la paginación del Service Layer devolvió un documento duplicado (`DocEntry 20388`, \$16.9M) — corregido con `Sort-Object DocEntry -Unique` antes de sumar. Sin este fix, Karihosqui Calderon aparecía con \$23M de exceso en vez de calzar exacto.
+- **Se buscó un reporte/consulta nativo de SAP que generara esta tabla — no existe.** Se revisaron las 344 consultas guardadas en `UserQueries` (Query Manager) — las únicas en categorías custom del cliente ("Ventas", "Compras", "General") son sobre `Invoices`/`CreditNotes` (facturación) y un chequeo de stock, nada sobre guías pendientes. Se revisaron también las 21 tablas propietarias `U_Z*` del sistema (`U_ZWHS1`, `U_ZPROVEE`, `U_ZCON1`, `U_ZFOL1`, `U_ZSCH1`, `U_ZTAX1`, etc.) — todas son configuración de facturación electrónica/SII, bodegas, proveedores, impuestos; ninguna tiene lógica de guías-por-vendedor. **Conclusión: la tabla de referencia del cliente viene de un proceso manual/Excel, no de un reporte nativo de SAP.**
+
+**Resultado final (2026-08-14, momento de la consulta):**
+
+| Vendedor | Calculado | Real (cliente) | Diferencia |
+|---|---|---|---|
+| Karihosqui Calderon | \$57,165,920 | \$57,165,920 | exacto |
+| Marcela Espinoza | \$6,944,090 | \$6,944,090 | exacto |
+| Florimar Rodriguez | \$287,695 | \$287,695 | exacto |
+| Luz Lacruz | \$1,300,880 | \$1,300,880 | exacto |
+| Insuseg | \$8,096,330 | \$8,624,730 | -\$528,400 |
+| Mariana Sanchez | \$147,020 | \$412,020 | -\$265,000 |
+| Carlos Cortes | \$3,798,020 | \$6,593,020 | -\$2,795,000 |
+| **Total** | **\$77,739,955** | **\$81,328,355** | **-\$3,588,400 (4.4%)** |
+
+**Pendiente, no resuelto:** el faltante de Carlos Cortés y Mariana Sánchez es **idéntico con o sin filtro de fecha** (probado sin ningún límite de fecha, todo el historial de guías abiertas) — confirma que ese monto no existe en `DeliveryNotes` bajo ningún vendedor ni ninguna fecha, para ninguno de sus clientes históricos reales (se cruzó contra `Sales` real, sin encontrar ningún documento mal codificado que lo explique). Es el mismo tipo de patrón que el hallazgo de vendedor mal asignado del 2026-08-02, pero esta vez el documento **no existe** en SAP como guía, no es solo un código equivocado. Antes de seguir ajustando la fórmula, hay que preguntarle directamente al equipo de ventas de dónde sale esa tabla y qué corrección manual aplican para Carlos/Insuseg/Mariana que SAP no refleja.
+
+**Implementado en código:** la fórmula usada hoy es manual (script ad-hoc contra el Service Layer), todavía **no está reflejada en `DeliveryNoteSyncService`** — ese servicio sincroniza guías abiertas con la clasificación `EsMuestraOCambio`, pero no aplica el filtro de `LineStatus` por línea ni agrupa por vendedor de línea. Pendiente de decidir si vale la pena ese nivel de detalle en el sync automático, dado que el objetivo final (cuadrar con el equipo de ventas) todavía tiene un 4.4% sin explicar.
+
+### Hallazgo (2026-08-14): guías de despacho entregadas y no facturadas — `DeliveryNotes`, no `Orders`
+
+A pedido del usuario, se investigó cómo identificar ventas reales entregadas pero aún no facturadas. La entidad correcta es **`DeliveryNotes`** (guías de despacho), no `Orders` — ver detalle completo en `BDhana.md` sección 8b (entidad explorada por primera vez esta sesión). Resumen:
+
+- `DeliveryNotes` con `DocumentStatus = Open` = mercadería que ya salió de bodega pero sigue sin facturar. Cada línea trae `BaseType`/`BaseEntry` apuntando al `DocEntry` de la `Order` origen (trazabilidad Orden → Guía).
+- De 689 guías abiertas en `INSUSEG` al momento de la consulta, **588 (85%) no son venta real** — muestras, cambios, guías internas a bordadoras ("LOGO"), donaciones, devoluciones por calidad, consumo interno. Se identifican por texto libre en `Comments`/`NumAtCard` (sin campo estructurado dedicado en SAP) combinado con un piso de monto (`DocTotal < 1000`, los casos no-venta son consistentemente de \$1–\$815).
+- **Resultado real:** 101 guías de venta genuina, entregadas y pendientes de facturar, por **\$123,433,381 CLP** (verificado manualmente, no cargado a Azure SQL todavía — ver plan abajo).
+
+### ⚠️ Hallazgo operativo (2026-08-14): trabajo en paralelo sin `git` disponible en esta máquina — conflicto real con `DeliveryNotes`
+
+Al intentar implementar el plan de sincronización de `DeliveryNotes` (ver más abajo), apareció un problema serio: **Ignacio ya había construido e implementado esto contra la base compartida de Azure SQL** (dos migraciones aplicadas, `AddDeliveryNotes` 2026-08-12 y `AddDeliveryNoteEsMuestraOCambio` 2026-08-13, con **689 filas reales ya sincronizadas**), pero **su código fuente nunca llegó a esta máquina** — ni la entidad, ni el servicio de sync, nada.
+
+**Causa raíz:** este proyecto vive dentro de una carpeta de OneDrive (`01 Melirrepu\...`), que sincroniza archivos entre las máquinas del equipo, incluyendo la carpeta `.git` (existe acá, `git status` la detecta). Pero **el ejecutable `git` no está instalado en esta máquina** — no se puede correr ningún comando `git` para revisar historial, ramas, o si el trabajo de Ignacio quedó comiteado en algún lado recuperable. Es decir: los *archivos* de `.git` llegan por OneDrive, pero sin el binario de `git` no sirven de nada acá. El esquema de Azure SQL sí se compartió (es un recurso en la nube, no un archivo local), por eso la tabla apareció con datos pero sin el código que la generó.
+
+**Resuelto en conjunto con Eric:** se decidió no pisar el trabajo ya hecho. Se adaptó el código nuevo (entidad, DTO, servicio de sync) al esquema **ya existente** en producción (`DocEntry`, `DocNum`, `CardCode`, `CardName`, `DocDate`, `SalesPersonCode`, `EsMuestraOCambio` — sin `DocTotal`/`Comments`/`NumAtCard`, esos campos no se persisten). La migración generada para este código coincidió exactamente con las columnas/tipos/FK ya reales (verificado contra `INFORMATION_SCHEMA.COLUMNS` antes de tocar nada) — se insertó manualmente en `__EFMigrationsHistory` como aplicada, **sin ejecutar el `CREATE TABLE`** (la tabla ya existía), para que el modelo de EF local quede sincronizado sin riesgo de romper la tabla real. Confirmado con `dotnet ef migrations has-pending-model-changes`: sin cambios pendientes.
+
+**Punto sin resolver:** el criterio exacto que usó Ignacio para calcular `EsMuestraOCambio` es desconocido (no hay código de referencia) — su resultado fue 136 guías reales / 553 muestra-cambio, mientras que la heurística de texto+monto de esta sesión (ver hallazgo arriba) da 101/588 sobre los mismos datos. Ambos números son plausibles, no se pudo reconciliar la diferencia. **Recomendación pendiente:** cuando Ignacio pueda instalar `git` en su máquina o compartir su código por otro medio, comparar los dos criterios y quedarse con uno solo.
+
+**Instalar `git` en esta máquina queda como pendiente de infraestructura** — sin eso, este tipo de choque de trabajo en paralelo va a repetirse.
+
+### ✅ Implementado (2026-08-14): sincronización de `DeliveryNotes` en el botón "Sincronizar ahora"
+
+A pedido explícito del usuario: la sincronización de guías vive en `Ventas/Sincronización`, en el **mismo botón** que ya sincroniza Ventas (`OnPostSyncAsync` corre `SalesSyncService` y `DeliveryNoteSyncService` en la misma pasada) — no se creó un botón nuevo. Si Ventas sincroniza bien pero Guías falla, se muestra igual el resumen de Ventas más el error de Guías por separado (no se pierde lo que sí funcionó).
+
+**Diseño final (más simple que el plan original de watermark por `UpdateDate`):** como el usuario pidió explícitamente **no guardar historia, solo el estado actual**, `DeliveryNoteSyncService.SyncAsync()` hace un **reemplazo completo** en cada corrida — trae todas las guías `Open`/no canceladas de SAP (sin filtro de fecha, "abiertas" ya acota el volumen a cientos, no miles), hace upsert de las que siguen viniendo, y **borra** cualquier fila que ya no aparezca (porque se facturó o se canceló desde la última corrida). Resuelve el mismo problema que motivó lo del watermark, sin necesitar lógica de fechas: si una guía dejó de estar abierta, simplemente no vuelve a traerse, y se elimina.
+
+**Clasificación real vs. muestra/cambio:** heurística de texto (`MUESTRA`, `CAMBIO`, `LOGO`, `INGRESO FALSO`, `NO FACTURAR`, `DONACION`, `CALIDAD`, `CONSUMO` en `Comments`/`NumAtCard`) + piso de monto (`DocTotal < 1000`) — mismo criterio validado manualmente en el hallazgo de arriba. Se calcula en `DeliveryNoteSyncService` al sincronizar y se guarda ya resuelta en `EsMuestraOCambio` (bit), siguiendo el esquema que ya existía — el dato crudo (`Comments`/`NumAtCard`/`DocTotal`) **no se persiste**, así que si el criterio cambia más adelante hay que volver a sincronizar (no alcanza con cambiar una consulta de lectura).
+
+**Pendiente:** el esquema actual no permite calcular el monto total pendiente de facturar desde SQL (no hay `DocTotal` guardado) — si se necesita ese número en el dashboard, hay que agregar una columna nueva (migración aditiva, no destructiva) y decidir junto con Ignacio cuál criterio de clasificación usar. Tampoco se construyó todavía ninguna UI que muestre estas guías — solo quedaron sincronizadas en la base.
+
+### Buscador y encabezados ordenables en "Ventas por cliente" (2026-08-08)
+
+Pedido del usuario: con 526 clientes y sin límite de filas (ver sesión 2026-07-29/30), encontrar/comparar clientes a mano era incómodo. Se agregó:
+- **Buscador** (`#buscador-cartera`) arriba de la tabla — filtra por nombre de cliente en vivo (evento `input`), sin distinguir mayúsculas ni acentos (normaliza con `texto.normalize('NFD')` + saca las marcas diacríticas, así "Núñez" y "nunez" matchean igual). Colapsa cualquier fila expandida que deje de coincidir. Un contador (`#cartera-contador`) muestra "X de Y cliente(s)" mientras hay texto escrito.
+- **Encabezados ordenables** (`th.th-ordenable`) — Cliente, cada mes, Total general, Promedio Mes, Peso Cliente, % Cartera y % MG. Clic ordena, clic de nuevo invierte el sentido; una flecha (▲/▼, naranja de marca) marca la columna activa. El N° de fila se **renumera** después de cada orden nuevo (es la posición visual, no un id fijo). El orden inicial (`Total general` descendente, el mismo que ya traía el servidor) queda marcado con la flecha desde que carga la página, sin necesitar un clic.
+- **Por qué no se parsea el texto formateado para ordenar:** los montos se muestran con separador de miles (`"9.911.250"`) en el formato/cultura que tenga configurado el servidor en cada momento (esta app no fija una cultura explícita — corre con la del SO, hoy es-CL en esta máquina, pero podría no serlo en otro entorno) — parsear ese texto sería frágil. En vez de eso, cada celda numérica lleva un `data-valor` con el número crudo en formato invariante (`CultureInfo.InvariantCulture`, siempre con `.` como separador decimal), que es lo que usa el JS para ordenar. El texto visible (`N0`, con separador de miles) sigue siendo el de siempre, sin cambios.
+- **Alcance:** solo la tabla principal de clientes — el detalle anidado (categorías/productos, ver más abajo) no tiene buscador ni orden propio todavía; no se pidió y las tablas ahí son mucho más chicas (típicamente <20 filas).
+
+### Tres bugs reales de scroll en tablas anidadas, encontrados y corregidos con Playwright (2026-08-08)
+
+Al agregar el nivel de categoría (ver sección siguiente), el detalle de Cartera pasó a tener **tablas anidadas dos niveles** (cliente → categoría → producto) en vez de uno solo. El usuario reportó que el scroll "se veía mal" y la columna fija no se mantenía — el primer intento (cambiar `border-collapse` de `collapse` a `separate`, por un bug conocido de Chrome con `position:sticky`) no alcanzó. Se terminó usando Playwright con credenciales reales para medir el DOM directamente (no solo mirar capturas) y aparecieron **tres causas distintas**, cada una tapando a la siguiente:
+
+1. **La tabla externa se estiraba sin límite** para acomodar el ancho de las tablas anidadas, en vez de dejar que cada una scrolleara por su cuenta — el truco CSS ya existente (`.fila-detalle td { width: 0 }`, ver sesión 2026-08-02) dejó de alcanzar con dos niveles de anidamiento (el contenido de una tabla anidada tiene un ancho mínimo que ese truco no logra ignorar). Medido con `el.scrollWidth === el.clientWidth` en las mini-tablas (o sea, cero scroll real) mientras el wrapper más externo sí tenía overflow real. **Fix:** `cartera.js` ahora le pone a cada mini-tabla un `max-width` inline en píxeles, medido en runtime contra `.insuseg-container` (un contenedor estable, no afectado por este problema) — función `limitarAnchoContenedor()`.
+2. **La celda de la esquina** (fija arriba Y a la izquierda — "N°"/"Cliente" en la tabla principal, "Categoría"/"Producto" en el detalle) tenía el mismo `z-index` que el resto del encabezado (ambos con `position:sticky`, mismo z-index, mismo stacking context) — al scrollear horizontal, las celdas del header que solo son fijas arriba (más adelante en el HTML) se dibujaban encima de la esquina y la tapaban casi por completo. **Fix:** regla nueva `.tabla-vertical-limitada table th.col-sticky { z-index: 4; }` (por encima del header normal, que tiene 3).
+3. **Scroll chaining:** al llegar al final del scroll de una mini-tabla, el gesto seguía de largo y movía la página ENTERA de golpe — confirmado con un scroll de mouse de verdad (`page.mouse.wheel`, no `scrollTop` asignado por script): la página saltaba de posición apenas la mini-tabla llegaba a su tope. Es lo que se sentía "incómodo" aunque ya no hubiera nada roto visualmente. **Fix:** `overscroll-behavior: contain;` en `.tabla-vertical-limitada` (aplica a las tres — cliente, categoría, producto — porque comparten esa clase).
+
+**Aprendizaje para la próxima vez que se toque scroll/sticky en esta app:** no alcanza con mirar una captura de pantalla estática — hubo que medir `scrollWidth`/`clientWidth`/`getComputedStyle` en el DOM real y probar con un scroll de mouse de verdad (no programático) para encontrar el bug #3, que no se veía en ninguna captura.
+
+### Detalle de Cartera en dos niveles: categoría → producto (2026-08-08)
+
+Pedido del usuario: que el detalle de un cliente muestre primero las **categorías** de producto, y al hacer clic en una, sus productos — antes iba directo a la lista de productos.
+
+**Hallazgo en el camino: `U_Categoria` en `Items` es un CÓDIGO, no el nombre.** La sesión 2026-08-03 ya había confirmado que `U_Categoria`/`U_Marca`/`U_Familia` tienen datos reales, pero no se había notado que el valor guardado en `Items.U_Categoria` es un código numérico como string (`"1"`, `"4"`...) que apunta a la tabla de usuario `U_ZCAT` (`GET /b1s/v1/U_ZCAT` → `{Code, Name}`, ej. `Code=4, Name="ROPA INDUSTRIAL"`) — el nombre real vive solo ahí. Se armó bien, con una tabla de dimensión nueva (mismo patrón que `SalesPerson`/`SalesPersonCode`):
+- Entidad `ItemCategory` (`Code`, `Name`) + `DbSet<ItemCategory> ItemCategories`, migración `AddItemCategories` (aditiva, aplicada).
+- `Item.CategoryCode` (antes se había armado como `Item.Category` con el código crudo sin resolver — se corrigió ANTES de comitear nada, no llegó a quedar en el historial de git).
+- `SapServiceLayerClient.GetItemCategoriesAsync()` (`U_ZCAT?$select=Code,Name`) + `InventorySyncService` ahora sincroniza categorías primero, después Items (mismo botón "Sincronizar productos" de siempre, sin UI nueva).
+- **Backfill corrido con éxito** (ver pendiente nuevo arriba sobre los colgados intermitentes): 25.457 productos, 24.818 con categoría asignada, 29 categorías reales (`CALZADO SEGURIDAD`, `PROTECCION VISUAL`, `ROPA INDUSTRIAL`, etc.).
+
+**Backend (`CarteraModel`):** `OnGetProductosAsync` (primer nivel, ya existía) ahora agrupa por categoría en vez de por producto — devuelve `codigo` + `nombre` de cada categoría (no solo el nombre, para tener una clave estable para el segundo nivel) con los mismos KPIs que antes (Peso Categoría, % Cartera, % MG). Handler nuevo `OnGetProductosPorCategoriaAsync(cardCode, categoriaCodigo)` — mismo cálculo que el viejo detalle por producto, pero acotado a una categoría; **"Peso Producto" ahora es relativo al total de la categoría** (antes era relativo al total del cliente) — se decidió así para seguir el mismo criterio que ya usa el resto de la página ("Peso X" = participación dentro del total del nivel padre inmediato).
+
+**Frontend (`cartera.js`):** reescrito para construir el DOM con `createElement`/`textContent` en vez de strings HTML concatenados (los nombres de categoría/producto son datos, no hay que confiar en que no traigan comillas u otros caracteres). El patrón de fila-clic-para-expandir se generalizó (`construirFilaExpandible`) para que la categoría se comporte igual que el cliente (mismo look de chevron, mismo cacheo por nivel).
+
+### Puntos de comparación año anterior en los gráficos de "Tendencia" y "Margen por mes" (2026-08-08)
+
+Pedido del usuario: ver en los gráficos, no solo en la tabla, si cada mes superó o no al mismo mes del año pasado — con el mes actual resaltado más que los pasados. Se cargó la skill `dataviz` antes de tocar los gráficos (mismo criterio que en sesiones anteriores).
+
+- **Backend:** `CarteraModel` calcula, para cada mes de `TendenciaMensual`/`MargenMensual`, la diferencia contra el mismo mes del año anterior (consulta aparte, mismo criterio que ya usaba el KPI "Comparado con año anterior" pero ahora para *todos* los meses del gráfico, no solo el actual). El horizonte de datos (¿existe año anterior o no?) se resuelve con `MIN(Sales.SaleDate)` en vivo, no hardcodeando `2024-01-01` de nuevo.
+- **Diseño de color validado con el validador de la skill (`validate_palette.js`):** verde/naranja-oscuro (los mismos que ya usan las tarjetas KPI `kpi-good`/`kpi-bad`) están en zona límite de daltonismo rojo-verde (ΔE 6.3, banda "legal solo con codificación secundaria") — por eso el estado **nunca depende solo del color**: círculo lleno (verde) = superó, rombo (naranja oscuro) = no alcanzó, anillo hueco (gris) = sin datos de comparación. El mes actual sale más grande y a color pleno; los pasados quedan atenuados.
+- Aplicado igual en los dos gráficos (círculos/rombos en el SVG de Tendencia, marcas chicas arriba de cada barra en Margen por mes), con leyenda de texto debajo de cada uno y el detalle exacto en el tooltip/`title`.
+- De paso, a pedido del usuario, se sacó la notación `"% Mg"` del gráfico de barras (quedó solo el número con `%`) — las tarjetas KPI de arriba no se tocaron, siguen diciendo `"% Mg"`.
 
 ### Hallazgo de seguridad: password de SAP en texto plano, encontrada y limpiada del repo (2026-08-07)
 

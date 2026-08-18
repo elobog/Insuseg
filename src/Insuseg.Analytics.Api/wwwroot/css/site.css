@@ -123,6 +123,13 @@ h1, h2, h3 {
     cursor: not-allowed;
 }
 
+/* Reasignar vendedor inline en la tabla de Usuarios — select + botón "Guardar" en una fila chica. */
+.form-asignar-vendedor {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .insuseg-btn-link {
     background: none;
     color: var(--insuseg-orange);
@@ -205,7 +212,11 @@ h1, h2, h3 {
 
 table.insuseg-table {
     width: 100%;
-    border-collapse: collapse;
+    /* separate, no collapse: con position:sticky (header + columnas fijas), border-collapse:collapse
+       tiene un bug conocido en Chrome (la columna fija deja de quedarse pegada al scrollear). No cambia
+       el look: los bordes ya se ponen por celda (border-bottom en th/td), no a nivel de tabla. */
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.9rem;
 }
 
@@ -368,6 +379,31 @@ table.insuseg-table tr:nth-child(even) {
     margin: 0 0 1rem;
 }
 
+/* Chips de leyenda dentro de una nota de texto (ej. estado de comparación año anterior en los
+   gráficos de Cartera) — el glifo lleva el color/forma; el texto ("verde"/"naranja"/"gris") se
+   queda en el gris normal de la nota, igual que en los gráficos el color nunca lo lleva el texto,
+   solo la marca. */
+.leyenda-punto {
+    font-weight: 400;
+    white-space: nowrap;
+}
+
+.leyenda-glifo {
+    font-weight: 700;
+}
+
+.leyenda-glifo-superado {
+    color: #2f7a3d;
+}
+
+.leyenda-glifo-no-alcanzado {
+    color: var(--insuseg-orange-dark);
+}
+
+.leyenda-glifo-sin-datos {
+    color: #696969;
+}
+
 .tabla-scroll {
     overflow-x: auto;
 }
@@ -387,12 +423,98 @@ table.insuseg-table td.col-mg {
     font-weight: 600;
 }
 
-.fila-cliente {
+/* Columnas del mes actual (Facturas/Guías/Total/% vs año anterior) en "Ventas por cliente" — se
+   "mueven" solas al mes que esté en curso (ver Cartera.cshtml.cs), reemplazando la columna simple que
+   tendría ese mes. Encabezado en naranja de marca (en vez del gris oscuro de siempre) + fondo tenue
+   en el cuerpo + borde a los dos lados del grupo — para que salte a la vista que estas 4 columnas son
+   distintas del resto (el mes en curso, no un mes ya cerrado). Ver Insuseg.md, 2026-08-12.
+   Ancho acotado en Facturas/Guías/Total (no en el %, que necesita más lugar para el nombre) y padding
+   más chico, para que entre más tabla en pantalla — el nombre completo de cada columna queda en el
+   title (tooltip) del encabezado.
+   El ancho (95px, con box-sizing:border-box de la línea 14 el padding ya está descontado de esos
+   95px) tiene que alcanzar para un monto de hasta 10 caracteres tipo "12.345.678" sin partirse en dos
+   líneas — con 72px (probado en la sesión 2026-08-12) números como "3.417.400" se cortaban a la mitad
+   y las 4 columnas quedaban pegoteadas. white-space:nowrap es la red de seguridad para que, si algún
+   valor igual no entra, se recorte con scroll de la tabla en vez de partirse en dos renglones. */
+table.insuseg-table th.col-mes-actual {
+    background: var(--insuseg-orange);
+}
+
+table.insuseg-table th.col-mes-actual:not(.col-mes-actual-fin),
+table.insuseg-table td.col-mes-actual:not(.col-mes-actual-fin) {
+    max-width: 95px;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+table.insuseg-table td.col-mes-actual {
+    background: #fff7f0;
+    white-space: nowrap;
+}
+
+table.insuseg-table th.col-mes-actual-inicio,
+table.insuseg-table td.col-mes-actual-inicio {
+    border-left: 2px solid var(--insuseg-orange-dark);
+}
+
+table.insuseg-table th.col-mes-actual-fin,
+table.insuseg-table td.col-mes-actual-fin {
+    border-right: 2px solid var(--insuseg-orange-dark);
+}
+
+table.insuseg-table td.col-mes-actual-total {
+    font-weight: 700;
+}
+
+/* Total de la columna "Guías" — chico, debajo del nombre de la columna, dentro del propio <th>.
+   white-space:nowrap ya viene heredado de th.th-ordenable; font-size reducido (mismo criterio que
+   insuseg-kpi-sub) para que un monto de hasta ~11 caracteres ("$78.200.862") quepa en los 95px de la
+   columna sin partirse — si algún mes el total fuera más largo, el scroll horizontal de la tabla (ya
+   existente) es la red de seguridad, mismo patrón que el resto de esta columna. */
+table.insuseg-table th.col-mes-actual .th-total {
+    font-size: 0.72rem;
+    font-weight: 600;
+    opacity: 0.85;
+    margin-top: 0.15rem;
+}
+
+/* Semáforo de ritmo en "% año ant.": verde si el cliente ya lleva, en lo que va del mes, más
+   porcentaje del año pasado que los días transcurridos del mes (RitmoEsperadoMesActualPct en
+   Cartera.cshtml.cs); rojo si va por debajo. Pastilla de fondo sólido (no solo texto de color) —
+   el primer intento coloreaba solo el texto con var(--insuseg-orange-dark), el mismo color exacto que
+   ya usa el borde de esta columna y el tinte del grupo entero, así que el estado "malo" se camuflaba
+   en la decoración en vez de leerse como alerta (ver Insuseg.md, 2026-08-12). Por eso "malo" usa acá
+   un rojo que no es el naranja de marca — a propósito distinto de kpi-bad/leyenda-glifo-no-alcanzado,
+   que sí pueden compartir el naranja porque no están sentados sobre un fondo ya teñido de naranja.
+   Filas sin dato de comparación ("—") no llevan pastilla, quedan con el texto normal de la tabla. */
+.chip-ritmo {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.chip-ritmo.pct-ritmo-bueno {
+    background: #2f7a3d;
+}
+
+.chip-ritmo.pct-ritmo-malo {
+    background: #b23b2e;
+}
+
+/* .fila-categoria es el mismo patrón fila-clic-para-expandir que .fila-cliente, un nivel más abajo
+   (categoría de producto, dentro del detalle de un cliente en Cartera) — comparte look y comportamiento. */
+.fila-cliente,
+.fila-categoria {
     cursor: pointer;
 }
 
 .fila-cliente:hover td,
-.fila-cliente.expandida td {
+.fila-cliente.expandida td,
+.fila-categoria:hover td,
+.fila-categoria.expandida td {
     background: var(--insuseg-gray-bg);
 }
 
@@ -440,7 +562,8 @@ table.insuseg-table-mini tbody tr {
     transition: transform 0.15s ease;
 }
 
-.fila-cliente.expandida .chevron {
+.fila-cliente.expandida .chevron,
+.fila-categoria.expandida .chevron {
     transform: rotate(90deg);
 }
 
@@ -485,7 +608,9 @@ table.insuseg-table-mini tbody tr {
 
 table.insuseg-table-mini {
     width: 100%;
-    border-collapse: collapse;
+    /* separate, no collapse — mismo motivo que .insuseg-table (ver ese comentario). */
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.82rem;
     background: #fff;
 }
@@ -513,12 +638,79 @@ table.insuseg-table-mini tr:nth-child(even) {
     margin: 0.75rem 0 0;
 }
 
+/* Buscador + contador — Ventas por cliente en Cartera. */
+.cartera-controles {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.cartera-buscador {
+    width: 100%;
+    max-width: 320px;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--insuseg-gray-light);
+    font-family: 'Open Sans', sans-serif;
+    font-size: 0.9rem;
+    border-radius: 0;
+}
+
+.cartera-buscador:focus {
+    outline: none;
+    border-color: var(--insuseg-orange);
+}
+
+.cartera-contador {
+    color: #696969;
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+/* Encabezados ordenables — clic para ordenar por esa columna, clic de nuevo invierte el sentido.
+   La flecha (▲/▼) solo se muestra en la columna con el orden activo; el resto queda neutro para no
+   sugerir que todas las columnas ya tienen un orden aplicado. */
+th.th-ordenable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+th.th-ordenable:hover {
+    background: #4a4a4a;
+}
+
+th.th-ordenable::after {
+    content: '';
+    display: inline-block;
+    width: 0.6em;
+    margin-left: 0.25em;
+    opacity: 0.5;
+}
+
+th.th-ordenable.orden-asc::after {
+    content: '▲';
+    opacity: 1;
+    color: var(--insuseg-orange);
+}
+
+th.th-ordenable.orden-desc::after {
+    content: '▼';
+    opacity: 1;
+    color: var(--insuseg-orange);
+}
+
 /* Tablas sin tope de filas: alto máximo con scroll propio, para que no empujen el resto de la página
    hacia abajo — se scrollea la tabla, no toda la pantalla, para llegar a lo que sigue. */
 .tabla-vertical-limitada {
     max-height: 420px;
     overflow-y: auto;
     border: 1px solid var(--insuseg-gray-light);
+    /* Sin esto, al llegar al final del scroll de ESTA tabla, el gesto sigue de largo y mueve toda la
+       página de golpe ("scroll chaining") — se siente brusco/incómodo, más notorio con tablas
+       anidadas (categoría/producto dentro de Cartera) porque hay varios de estos contenedores chicos
+       uno dentro del otro. Bug real, confirmado con un scroll de mouse de verdad (no forzado por script). */
+    overscroll-behavior: contain;
 }
 
 .tabla-vertical-limitada table.insuseg-table {
@@ -529,6 +721,14 @@ table.insuseg-table-mini tr:nth-child(even) {
     position: sticky;
     top: 0;
     z-index: 3;
+}
+
+/* La celda de la esquina (fija arriba Y a la izquierda, ej. "N°"/"Cliente"/"Categoría") necesita un
+   z-index más alto que el resto del header — si no, al scrollear horizontal, las celdas del header que
+   solo son fijas arriba (vienen después en el HTML, mismo z-index que la esquina) se dibujan encima de
+   la esquina en vez de al revés, y la tapan casi por completo. Bug real encontrado con Playwright. */
+.tabla-vertical-limitada table th.col-sticky {
+    z-index: 4;
 }
 
 .tabla-vertical-limitada.expandida {
@@ -588,10 +788,39 @@ table.insuseg-table-mini tr:nth-child(even) {
     stroke-linecap: round;
 }
 
-.viz-punto {
-    fill: var(--insuseg-orange);
-    stroke: #fff;
+/* Marcas de estado por mes (Tendencia y Margen por mes) — comparan cada mes contra el mismo mes
+   del año anterior. El color reutiliza el mismo verde/naranja oscuro que ya usan las tarjetas KPI
+   "kpi-good"/"kpi-bad", pero el estado NUNCA depende solo del color: cada estado tiene una forma
+   distinta (círculo lleno / rombo / anillo hueco) — validado con la skill dataviz, el par verde/naranja
+   está en la banda "WARN" de separación ante daltonismo rojo-verde, legal solo con esta codificación
+   secundaria por forma. Los meses pasados salen atenuados (opacity); el mes actual sale a tamaño y
+   opacidad plena para que resalte más — ver clase .marca-actual. */
+.viz-marca {
     stroke-width: 2;
+    transition: opacity 0.15s ease;
+}
+
+.viz-marca-superado {
+    fill: #2f7a3d;
+    stroke: #fff;
+}
+
+.viz-marca-no-alcanzado {
+    fill: var(--insuseg-orange-dark);
+    stroke: #fff;
+}
+
+.viz-marca-sin-datos {
+    fill: none;
+    stroke: #696969;
+}
+
+.viz-marca:not(.marca-actual) {
+    opacity: 0.55;
+}
+
+.viz-marca.marca-actual {
+    opacity: 1;
 }
 
 .viz-etiqueta-valor {
@@ -654,6 +883,42 @@ table.insuseg-table-mini tr:nth-child(even) {
     align-items: center;
     justify-content: flex-end;
     height: 100%;
+}
+
+/* Marca de estado sobre cada columna — mismo criterio de color+forma que .viz-marca en Tendencia,
+   adaptado a HTML/CSS en vez de SVG (círculo lleno / rombo / anillo hueco). */
+.margen-marca {
+    width: 9px;
+    height: 9px;
+    margin: 0 auto 0.35rem;
+    box-sizing: border-box;
+    transition: opacity 0.15s ease;
+}
+
+.margen-marca-superado {
+    background: #2f7a3d;
+    border-radius: 50%;
+}
+
+.margen-marca-no-alcanzado {
+    background: var(--insuseg-orange-dark);
+    transform: rotate(45deg);
+}
+
+.margen-marca-sin-datos {
+    background: transparent;
+    border: 2px solid #696969;
+    border-radius: 50%;
+}
+
+.margen-marca:not(.marca-actual) {
+    opacity: 0.55;
+}
+
+.margen-marca.marca-actual {
+    width: 14px;
+    height: 14px;
+    opacity: 1;
 }
 
 .margen-pct {

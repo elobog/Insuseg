@@ -148,6 +148,32 @@ Misma estructura de cabecera/líneas que `Invoices` para los campos que usa este
 
 ---
 
+## 8b. Guías de despacho → `DeliveryNotes`
+
+Guía de despacho (Delivery, SAP interno: ODLN/DLN1) — **entidad nueva, explorada por primera vez el 2026-08-14**, no se había tocado hasta ahora. Es el eslabón intermedio del flujo Orden → Guía → Factura: representa mercadería que **ya salió de bodega** pero puede o no estar facturada todavía.
+
+**Total en `INSUSEG`:** 14.945 guías, de las cuales **689 están `DocumentStatus = 'bost_Open'`** (no cerradas — o sea, con saldo pendiente de facturar) al 2026-08-14.
+
+**Misma estructura de cabecera/líneas que `Orders`/`Invoices`** para los campos que usa este proyecto (`DocEntry`, `DocNum`, `DocDate`, `CardCode`, `CardName`, `SalesPersonCode`, `DocTotal`, `Comments`, `NumAtCard`, `DocumentStatus`, `Cancelled`).
+
+**Relación con Órdenes de Venta:** cada línea de `DeliveryNotes.DocumentLines` tiene `BaseType`/`BaseEntry`/`BaseLine` apuntando al `DocEntry`/línea de la `Order` origen (`BaseType = 17` = código interno SAP para "Orders") — permite trazar exactamente qué Orden generó cada guía. A nivel de línea, además:
+- `LineStatus` (`bost_Open`/`bost_Closed`) — si esa línea puntual ya se facturó o no.
+- `RemainingOpenQuantity`, `OpenAmount` — cuánto de esa línea sigue sin facturar (en unidades y en $), útil si se necesita precisión a nivel de línea en vez de solo a nivel de documento.
+
+**Hallazgo: `DocumentStatus = Open` en `DeliveryNotes` NO equivale a "venta real pendiente de facturar".** De las 689 guías abiertas, 588 (85%) corresponden a conceptos que no son venta de producto — identificables por texto literal en `Comments`/`NumAtCard` (mayúsculas, sin campo estructurado dedicado):
+- `MUESTRA` / `MUESTRAS` (muestras de producto, con o sin retorno)
+- `CAMBIO` (cambio de producto — devolución/reposición, no venta nueva)
+- `LOGO` (guías internas hacia bordadoras externas — `GMR BORDADOS`, contratistas de bordado — servicio, no venta de producto)
+- `Donaciones`
+- `Devolución por calidad` / `devolucon por calidad` (sic, hay un typo real en el dato)
+- `Consumo` / `stock ... consumo` (consumo interno)
+
+Estos casos son consistentemente de monto ínfimo (\$1–\$815, promedio ~\$37) frente a guías de venta real (cientos de miles a decenas de millones). Un umbral de `DocTotal < 1000` combinado con el filtro de palabras clave separa ambos grupos de forma limpia — verificado manualmente contra las 588 excluidas, ningún falso positivo evidente.
+
+**No existe ningún campo estructurado (código, categoría, flag booleano) que marque esto en SAP** — es texto libre escrito por quien genera el documento. Cualquier sincronización que calcule "pendiente de facturar real" tiene que aplicar esta heurística de texto, no puede confiar en un campo dedicado.
+
+---
+
 ## 9. Stock por almacén
 
 No es una entidad top-level independiente; se obtiene expandida dentro de `Items` vía la colección `ItemWarehouseInfoCollection` (ya viene incluida por defecto al consultar `Items`, no requiere `$expand` — se detectaron **7 almacenes activos: códigos `01` a `07`**).

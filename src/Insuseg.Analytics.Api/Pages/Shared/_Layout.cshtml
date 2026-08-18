@@ -1,5 +1,6 @@
 @using Microsoft.AspNetCore.Identity
-@inject SignInManager<IdentityUser> SignInManager
+@using Insuseg.Analytics.Data.Entities
+@inject SignInManager<ApplicationUser> SignInManager
 @{
     var currentPath = Context.Request.Path.Value ?? string.Empty;
     bool IsActive(string prefix) => currentPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
@@ -30,7 +31,10 @@
             <nav class="insuseg-sidebar">
                 <div class="insuseg-section-title">Ventas</div>
                 <a asp-page="/Ventas/Cartera" class="@(IsActive("/Ventas/Cartera") ? "active" : "")">Cartera de clientes</a>
-                <a asp-page="/Ventas/Sincronizacion" class="@(IsActive("/Ventas/Sincronizacion") ? "active" : "")">Sincronización</a>
+                @if (!User.IsInRole("Vendedor"))
+                {
+                    <a asp-page="/Ventas/Sincronizacion" class="@(IsActive("/Ventas/Sincronizacion") ? "active" : "")">Sincronización</a>
+                }
 
                 @if (User.IsInRole("Admin"))
                 {

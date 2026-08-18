@@ -8,7 +8,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Archivos de conflicto de sincronización de OneDrive (sufijo "-igancio") — ver el mismo
+         comentario en Insuseg.Analytics.Data.csproj. -->
+    <Compile Remove="**\*-igancio.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Insuseg.Analytics.Data\Insuseg.Analytics.Data.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Se copia a la raíz del publish (no a wwwroot — no hace falta que sea servible por HTTP) para
+         que OPENSSL_CONF (App Setting en Azure) pueda apuntarle. Ver comentario dentro del archivo. -->
+    <None Include="openssl-legacy.cnf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

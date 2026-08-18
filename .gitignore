@@ -1,6 +1,8 @@
 ## .NET / Visual Studio
 bin/
 obj/
+publish/
+publish.zip
 *.user
 .vs/
 

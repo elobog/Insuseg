@@ -7,6 +7,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Archivos de conflicto de sincronización de OneDrive (sufijo "-igancio", aparecen cuando este
+         mismo archivo se edita casi al mismo tiempo desde otra máquina en la carpeta compartida) — no
+         son código propio del proyecto, se excluyen de la compilación sin tocarlos/borrarlos. -->
+    <Compile Remove="**\*-igancio.cs" />
+    <!-- Migración independiente de Ignacio para la misma tabla DeliveryNotes (mismo nombre de clase,
+         timestamp distinto — 2026-08-13 23:28, un día después de la nuestra) — nunca aplicada por
+         nosotros a sqldb-insuseg-analytics (ver Insuseg.md). Choca en tiempo de compilación con
+         20260812192753_AddDeliveryNotes.cs, que sí es la que está aplicada en la base real. Se excluye
+         sin borrarla — hay que coordinar con Ignacio antes de decidir qué hacer con este archivo. -->
+    <Compile Remove="Migrations\20260813232840_AddDeliveryNotes.cs" />
+    <Compile Remove="Migrations\20260813232840_AddDeliveryNotes.Designer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.9">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
