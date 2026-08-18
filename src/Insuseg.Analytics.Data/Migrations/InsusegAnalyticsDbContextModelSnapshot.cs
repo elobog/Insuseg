@@ -22,11 +22,80 @@ namespace Insuseg.Analytics.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Insuseg.Analytics.Data.Entities.DeliveryNote", b =>
+                {
+                    b.Property<int>("DocEntry")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CardCode")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("nvarchar(15)");
+
+                    b.Property<string>("CardName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateOnly>("DocDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("DocNum")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("EsMuestraOCambio")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("SalesPersonCode")
+                        .HasColumnType("int");
+
+                    b.HasKey("DocEntry");
+
+                    b.HasIndex("SalesPersonCode");
+
+                    b.ToTable("DeliveryNotes");
+                });
+
+            modelBuilder.Entity("Insuseg.Analytics.Data.Entities.DeliveryNoteLine", b =>
+                {
+                    b.Property<int>("DocEntry")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LineNum")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ItemCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<int?>("SalesPersonCode")
+                        .HasColumnType("int");
+
+                    b.HasKey("DocEntry", "LineNum");
+
+                    b.HasIndex("SalesPersonCode");
+
+                    b.ToTable("DeliveryNoteLines");
+                });
+
             modelBuilder.Entity("Insuseg.Analytics.Data.Entities.Item", b =>
                 {
                     b.Property<string>("ItemCode")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CategoryCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("ItemName")
                         .IsRequired()
@@ -47,6 +116,22 @@ namespace Insuseg.Analytics.Data.Migrations
                     b.HasKey("ItemCode");
 
                     b.ToTable("Items");
+                });
+
+            modelBuilder.Entity("Insuseg.Analytics.Data.Entities.ItemCategory", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Code");
+
+                    b.ToTable("ItemCategories");
                 });
 
             modelBuilder.Entity("Insuseg.Analytics.Data.Entities.Sale", b =>
@@ -337,6 +422,15 @@ namespace Insuseg.Analytics.Data.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("Insuseg.Analytics.Data.Entities.DeliveryNote", b =>
+                {
+                    b.HasOne("Insuseg.Analytics.Data.Entities.SalesPerson", "SalesPerson")
+                        .WithMany()
+                        .HasForeignKey("SalesPersonCode");
+
+                    b.Navigation("SalesPerson");
                 });
 
             modelBuilder.Entity("Insuseg.Analytics.Data.Entities.Sale", b =>

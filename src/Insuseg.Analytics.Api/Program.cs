@@ -1,5 +1,6 @@
 using Insuseg.Analytics.Data;
 using Insuseg.Analytics.Data.Configuration;
+using Insuseg.Analytics.Data.Entities;
 using Insuseg.Analytics.Data.Sap;
 using Insuseg.Analytics.Data.Sync;
 using Microsoft.AspNetCore.Identity;
@@ -23,7 +24,7 @@ builder.Services.AddDbContext<InsusegAnalyticsDbContext>(options =>
 // También registra el esquema de cookie ("Identity.Application") que usan las páginas Razor del
 // dashboard — conviven dos formas de autenticarse: Bearer para /api/*, cookie para las páginas.
 builder.Services
-    .AddIdentityApiEndpoints<IdentityUser>()
+    .AddIdentityApiEndpoints<ApplicationUser>()
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<InsusegAnalyticsDbContext>();
 
@@ -49,6 +50,7 @@ builder.Services.AddScoped<SalesSyncService>();
 // necesita el nombre de los ítems (tabla Items), que solo este servicio actualiza. El botón que lo
 // dispara se movió a Ventas/Sincronización (ver Insuseg.md).
 builder.Services.AddScoped<InventorySyncService>();
+builder.Services.AddScoped<DeliveryNoteSyncService>();
 
 var app = builder.Build();
 
@@ -83,17 +85,17 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapIdentityApi<IdentityUser>();
+app.MapIdentityApi<ApplicationUser>();
 app.MapRazorPages();
 
 // Sembrado de roles (idempotente en cada arranque, no requiere migración nueva porque
-// IdentityDbContext<IdentityUser> ya incluye AspNetRoles/AspNetUserRoles con IdentityRole por
+// IdentityDbContext<ApplicationUser> ya incluye AspNetRoles/AspNetUserRoles con IdentityRole por
 // defecto). Admin es el único rol que puede crear/borrar cuentas (ver Usuarios.cshtml.cs); las
 // dos cuentas del equipo ya existentes quedan como Admin al arrancar si todavía no lo son.
 using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
     foreach (var role in new[] { "Admin", "Ejecutivo", "Vendedor" })
     {

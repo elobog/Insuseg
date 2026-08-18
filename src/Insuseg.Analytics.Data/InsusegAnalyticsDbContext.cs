@@ -8,7 +8,7 @@ namespace Insuseg.Analytics.Data;
 // Este DbContext apunta a sqldb-insuseg-analytics (Azure SQL), nunca a SAP.
 // Hereda de IdentityDbContext para que las tablas de login (AspNetUsers, AspNetRoles, etc.) vivan
 // en la misma base — ver Insuseg.md sección 2 (decisión de usar ASP.NET Core Identity).
-public class InsusegAnalyticsDbContext : IdentityDbContext<IdentityUser>
+public class InsusegAnalyticsDbContext : IdentityDbContext<ApplicationUser>
 {
     public InsusegAnalyticsDbContext(DbContextOptions<InsusegAnalyticsDbContext> options)
         : base(options)
@@ -18,7 +18,10 @@ public class InsusegAnalyticsDbContext : IdentityDbContext<IdentityUser>
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SalesPerson> SalesPersons => Set<SalesPerson>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<ItemCategory> ItemCategories => Set<ItemCategory>();
     public DbSet<SaleLine> SaleLines => Set<SaleLine>();
+    public DbSet<DeliveryNote> DeliveryNotes => Set<DeliveryNote>();
+    public DbSet<DeliveryNoteLine> DeliveryNoteLines => Set<DeliveryNoteLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -56,6 +59,14 @@ public class InsusegAnalyticsDbContext : IdentityDbContext<IdentityUser>
             entity.Property(i => i.ItemName).HasMaxLength(200);
             entity.Property(i => i.QuantityOnStock).HasPrecision(18, 3);
             entity.Property(i => i.MovingAveragePrice).HasPrecision(18, 4);
+            entity.Property(i => i.CategoryCode).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<ItemCategory>(entity =>
+        {
+            entity.HasKey(c => c.Code);
+            entity.Property(c => c.Code).HasMaxLength(20).ValueGeneratedNever();
+            entity.Property(c => c.Name).HasMaxLength(100);
         });
 
         modelBuilder.Entity<SaleLine>(entity =>
@@ -66,6 +77,29 @@ public class InsusegAnalyticsDbContext : IdentityDbContext<IdentityUser>
             entity.Property(l => l.Quantity).HasPrecision(18, 3);
             entity.Property(l => l.LineTotal).HasPrecision(18, 2);
             entity.Property(l => l.GrossBuyPrice).HasPrecision(18, 4);
+        });
+
+        modelBuilder.Entity<DeliveryNote>(entity =>
+        {
+            entity.HasKey(d => d.DocEntry);
+            entity.Property(d => d.DocEntry).ValueGeneratedNever();
+            entity.Property(d => d.CardCode).HasMaxLength(15);
+            entity.Property(d => d.CardName).HasMaxLength(100);
+
+            entity.HasOne(d => d.SalesPerson)
+                .WithMany()
+                .HasForeignKey(d => d.SalesPersonCode)
+                .IsRequired(false);
+        });
+
+        modelBuilder.Entity<DeliveryNoteLine>(entity =>
+        {
+            entity.HasKey(l => new { l.DocEntry, l.LineNum });
+            entity.Property(l => l.ItemCode).HasMaxLength(50);
+            entity.Property(l => l.Quantity).HasPrecision(18, 3);
+            entity.Property(l => l.LineTotal).HasPrecision(18, 2);
+
+            entity.HasIndex(l => l.SalesPersonCode);
         });
     }
 }

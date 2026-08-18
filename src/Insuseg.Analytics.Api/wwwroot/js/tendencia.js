@@ -14,6 +14,16 @@ document.addEventListener('DOMContentLoaded', function () {
         var tooltip = contenedor.querySelector('.viz-tooltip');
         var formateador = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
 
+        function textoComparacion(punto) {
+            if (punto.estado === 'SinDatos' || punto.diferencia === null || punto.diferencia === undefined) {
+                return '○ Sin datos del mismo mes del año anterior para comparar';
+            }
+            if (punto.diferencia <= 0) {
+                return '● Superó el mismo mes del año anterior por $' + formateador.format(Math.abs(punto.diferencia));
+            }
+            return '◆ No alcanzó el mismo mes del año anterior (faltan $' + formateador.format(punto.diferencia) + ')';
+        }
+
         function puntoMasCercano(xSvg) {
             var mejor = puntos[0];
             var mejorDistancia = Math.abs(puntos[0].x - xSvg);
@@ -45,8 +55,11 @@ document.addEventListener('DOMContentLoaded', function () {
             valor.textContent = '$' + formateador.format(punto.monto);
             var etiqueta = document.createElement('span');
             etiqueta.textContent = punto.etiqueta;
+            var comparacion = document.createElement('span');
+            comparacion.textContent = textoComparacion(punto);
             tooltip.appendChild(valor);
             tooltip.appendChild(etiqueta);
+            tooltip.appendChild(comparacion);
 
             var xPct = punto.x / viewBox.width * 100;
             tooltip.style.left = xPct + '%';

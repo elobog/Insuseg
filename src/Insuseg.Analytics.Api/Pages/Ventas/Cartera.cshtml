@@ -1,9 +1,17 @@
 @page
 @using System.Globalization
+@using Insuseg.Analytics.Api.Pages.Ventas
 @model Insuseg.Analytics.Api.Pages.Ventas.CarteraModel
 @{
     ViewData["Title"] = "Cartera de clientes";
-    var colspanDetalle = Model.Meses.Count + 7;
+    // El mes actual (último de Model.Meses) se reemplaza por 4 columnas (Facturas/Guías/Total/% vs
+    // año anterior) en vez de la columna simple de siempre, PERO solo cuando ese mes es de verdad el
+    // mes calendario de hoy (Model.DesgloseMesActualDisponible) — ver esa propiedad en
+    // Cartera.cshtml.cs para el porqué. Si no, el último mes se trata como uno más.
+    // mesesNormales es la misma lista para el thead y el tbody (un mes menos cuando hay desglose).
+    var mesesNormales = Model.DesgloseMesActualDisponible ? Model.Meses.Take(Model.Meses.Count - 1) : Model.Meses;
+    // +10 (2 columnas fijas + 5 de siempre + 4 en vez de 1 = +3 extra) con desglose; +7 sin él.
+    var colspanDetalle = Model.Meses.Count + (Model.DesgloseMesActualDisponible ? 10 : 7);
 
     // Geometría del gráfico de tendencia — se calcula acá (no en el PageModel) porque es puramente de
     // presentación: coordenadas SVG, no datos de negocio.
@@ -17,6 +25,9 @@
     {
         p.Etiqueta,
         p.Monto,
+        p.Estado,
+        p.DiferenciaAnioAnterior,
+        EsActual = p.Etiqueta == Model.MesActual?.Etiqueta,
         X = puntosTendencia.Count > 1 ? padIzq + anchoUtilSvg * i / (puntosTendencia.Count - 1) : padIzq + anchoUtilSvg / 2,
         Y = padSup + altoUtilSvg - (maxMontoTendencia > 0 ? (double)(p.Monto / maxMontoTendencia) * altoUtilSvg : 0),
     }).ToList();
@@ -28,11 +39,34 @@
         : "";
     var pasoEtiquetaTendencia = coordsTendencia.Count > 14 ? (int)Math.Ceiling(coordsTendencia.Count / 14.0) : 1;
     var puntosTendenciaJson = System.Text.Json.JsonSerializer.Serialize(
-        coordsTendencia.Select(c => new { x = c.X, y = c.Y, etiqueta = c.Etiqueta, monto = c.Monto }));
+        coordsTendencia.Select(c => new
+        {
+            x = c.X,
+            y = c.Y,
+            etiqueta = c.Etiqueta,
+            monto = c.Monto,
+            estado = c.Estado.ToString(),
+            diferencia = c.DiferenciaAnioAnterior,
+        }));
 }
 <div class="insuseg-container">
     <h1>Cartera de clientes</h1>
-    <p class="insuseg-subtitle">Ventas mensuales por cliente. Hacé clic en un cliente para ver el detalle por producto.</p>
+    <p class="insuseg-subtitle">
+        @if (Model.EsVendedorRestringido)
+        {
+            <text>Tu cartera de clientes. </text>
+        }
+        else
+        {
+            <text>Ventas mensuales por cliente. </text>
+        }
+        Hacé clic en un cliente para ver el detalle por categoría de producto, y en una categoría para ver sus productos.
+    </p>
+
+    @if (Model.VendedorSinAsignar)
+    {
+        <div class="insuseg-error">⚠️ Tu cuenta todavía no tiene un vendedor de SAP asignado — pedile a un administrador que te lo asigne en Administración → Usuarios. Mientras tanto no vas a ver clientes acá.</div>
+    }
 
     <form method="get" class="insuseg-filters">
         <div class="insuseg-field">
@@ -43,16 +77,19 @@
             <label for="hasta">Hasta</label>
             <input type="date" id="hasta" name="Hasta" value="@Model.Hasta?.ToString("yyyy-MM-dd")" />
         </div>
-        <div class="insuseg-field">
-            <label for="vendedor">Vendedor</label>
-            <select id="vendedor" name="VendedorCodigo">
-                <option value="">Todos los vendedores</option>
-                @foreach (var v in Model.Vendedores)
-                {
-                    <option value="@v.Codigo" selected="@(Model.VendedorCodigo == v.Codigo ? "selected" : null)">@v.Nombre</option>
-                }
-            </select>
-        </div>
+        @if (!Model.EsVendedorRestringido)
+        {
+            <div class="insuseg-field">
+                <label for="vendedor">Vendedor</label>
+                <select id="vendedor" name="VendedorCodigo">
+                    <option value="">Todos los vendedores</option>
+                    @foreach (var v in Model.Vendedores)
+                    {
+                        <option value="@v.Codigo" selected="@(Model.VendedorCodigo == v.Codigo ? "selected" : null)">@v.Nombre</option>
+                    }
+                </select>
+            </div>
+        }
         <button type="submit" class="insuseg-btn">Aplicar</button>
     </form>
 
@@ -97,6 +134,13 @@
         }
         else
         {
+            <p class="detalle-nota">
+                Los puntos comparan cada mes con el mismo mes del año anterior:
+                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-superado">●</span> verde</span> = superó,
+                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-no-alcanzado">◆</span> naranja</span> = no alcanzó,
+                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-sin-datos">○</span> gris</span> = sin datos para comparar
+                (mes fuera del historial cargado). El mes actual se destaca en tamaño y color pleno.
+            </p>
             <div class="viz-tendencia" data-puntos='@puntosTendenciaJson'>
                 <svg viewBox="0 0 @F(anchoSvg) @F(altoSvg)" class="viz-svg" role="img" aria-label="Tendencia de ventas netas por mes">
                     <line x1="@F(padIzq)" y1="@F(padSup + altoUtilSvg)" x2="@F(anchoSvg - padDer)" y2="@F(padSup + altoUtilSvg)" class="viz-baseline" />
@@ -104,9 +148,24 @@
                     <path d="@lineaPathTendencia" class="viz-linea"></path>
                     @foreach (var c in coordsTendencia)
                     {
-                        <circle cx="@F(c.X)" cy="@F(c.Y)" r="4.5" class="viz-punto"></circle>
+                        var radio = c.EsActual ? 7.0 : 4.5;
+                        var claseProminencia = c.EsActual ? "marca-actual" : "";
+                        if (c.Estado == CarteraModel.EstadoComparacionMes.Superado)
+                        {
+                            <circle cx="@F(c.X)" cy="@F(c.Y)" r="@F(radio)" class="viz-marca viz-marca-superado @claseProminencia"></circle>
+                        }
+                        else if (c.Estado == CarteraModel.EstadoComparacionMes.NoAlcanzado)
+                        {
+                            var lado = radio * 1.3;
+                            <rect x="@F(c.X - lado / 2)" y="@F(c.Y - lado / 2)" width="@F(lado)" height="@F(lado)"
+                                  transform="rotate(45 @F(c.X) @F(c.Y))" class="viz-marca viz-marca-no-alcanzado @claseProminencia"></rect>
+                        }
+                        else
+                        {
+                            <circle cx="@F(c.X)" cy="@F(c.Y)" r="@F(radio)" class="viz-marca viz-marca-sin-datos @claseProminencia"></circle>
+                        }
                     }
-                    <text x="@F(coordsTendencia[^1].X)" y="@F(Math.Max(coordsTendencia[^1].Y - 10, 10))" class="viz-etiqueta-valor" text-anchor="end">$@coordsTendencia[^1].Monto.ToString("N0")</text>
+                    <text x="@F(coordsTendencia[^1].X)" y="@F(Math.Max(coordsTendencia[^1].Y - 14, 10))" class="viz-etiqueta-valor" text-anchor="end">$@coordsTendencia[^1].Monto.ToString("N0")</text>
                     <line class="viz-crosshair" x1="0" y1="@F(padSup)" x2="0" y2="@F(padSup + altoUtilSvg)" style="display:none"></line>
                     <circle class="viz-crosshair-punto" r="5.5" style="display:none"></circle>
                 </svg>
@@ -134,15 +193,36 @@
             var mesDestacado = Model.MargenMensual.OrderByDescending(m => m.Monto).First().Etiqueta;
             <p class="detalle-nota">
                 Margen neto (venta − costo) por mes del período filtrado. La altura de la barra es el monto;
-                el <strong>% Mg</strong> arriba es margen ÷ venta neta de ese mes.
+                el <strong>%</strong> arriba es margen ÷ venta neta de ese mes.
+                El punto sobre cada columna compara el margen del mes con el mismo mes del año anterior:
+                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-superado">●</span> verde</span> = superó,
+                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-no-alcanzado">◆</span> naranja</span> = no alcanzó,
+                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-sin-datos">○</span> gris</span> = sin datos para comparar.
+                El mes actual se destaca en tamaño y color pleno.
             </p>
             <div class="margen-chart-scroll">
                 <div class="margen-chart">
                     @foreach (var m in Model.MargenMensual)
                     {
                         var alturaPct = maxMargenMensual > 0 ? (double)(m.Monto / maxMargenMensual) * 100 : 0;
-                        <div class="margen-barra-col @(m.Etiqueta == mesDestacado ? "destacada" : "")" title="@(m.Etiqueta): @m.PorcentajeMargen.ToString("N1") % Mg ($@m.Monto.ToString("N0"))">
-                            <div class="margen-pct">@m.PorcentajeMargen.ToString("N1") % Mg</div>
+                        var esActual = m.Etiqueta == Model.MesActual?.Etiqueta;
+                        var claseEstado = m.Estado switch
+                        {
+                            CarteraModel.EstadoComparacionMes.Superado => "margen-marca-superado",
+                            CarteraModel.EstadoComparacionMes.NoAlcanzado => "margen-marca-no-alcanzado",
+                            _ => "margen-marca-sin-datos",
+                        };
+                        var textoComparacion = m.Estado switch
+                        {
+                            CarteraModel.EstadoComparacionMes.Superado =>
+                                $"superó el margen del mismo mes del año anterior por ${Math.Abs(m.DiferenciaAnioAnterior ?? 0).ToString("N0")}",
+                            CarteraModel.EstadoComparacionMes.NoAlcanzado =>
+                                $"no alcanzó el margen del mismo mes del año anterior (faltan ${m.DiferenciaAnioAnterior?.ToString("N0")})",
+                            _ => "sin datos del mismo mes del año anterior para comparar",
+                        };
+                        <div class="margen-barra-col @(m.Etiqueta == mesDestacado ? "destacada" : "")" title="@(m.Etiqueta): @m.PorcentajeMargen.ToString("N1") % ($@m.Monto.ToString("N0")) — @textoComparacion">
+                            <div class="margen-marca @claseEstado @(esActual ? "marca-actual" : "")"></div>
+                            <div class="margen-pct">@m.PorcentajeMargen.ToString("N1") %</div>
                             <div class="margen-valor">$@((m.Monto / 1000).ToString("N0"))k</div>
                             <div class="margen-barra" style="height:@(alturaPct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%"></div>
                         </div>
@@ -165,27 +245,59 @@
             <strong>Peso Cliente</strong> = monto del cliente ÷ total de todos los clientes del período filtrado.
             <strong>% Cartera</strong> = monto del cliente ÷ total de su vendedor asignado (chip junto al nombre) en el período.
         </p>
+        @if (Model.DesgloseMesActualDisponible)
+        {
+            <p class="detalle-nota">
+                El mes actual (@(Model.MesActual?.Etiqueta ?? "—"), resaltado en la tabla) se desglosa en 4 columnas en vez de mostrar un solo monto:
+                <strong>Facturas</strong> = ventas ya facturadas ese mes.
+                <strong>Guías</strong> = TODAS las guías de despacho pendientes de facturar de ese cliente (no solo las de este mes — el acumulado completo).
+                <strong>Total</strong> = Facturas del mes + Guías pendientes.
+                <strong>% vs @(Model.MesAnioAnteriorEtiqueta ?? "año anterior")</strong> = Total ÷ venta neta de ese mismo cliente en el mismo mes, un año antes.
+                Estas 4 columnas se mueven solas al mes que esté en curso — el resto de los meses sigue mostrando un solo monto, como siempre. Si filtrás
+                el período para que termine en un mes ya cerrado, este desglose se apaga y ese mes se ve como cualquier otro.
+            </p>
+        }
         @if (Model.Clientes.Count == 0)
         {
             <p>No hay ventas en el período seleccionado.</p>
         }
         else
         {
+            <div class="cartera-controles">
+                <input type="text" id="buscador-cartera" class="cartera-buscador" placeholder="Buscar cliente…" autocomplete="off" />
+                <span class="cartera-contador" id="cartera-contador"></span>
+            </div>
             <div class="tabla-scroll tabla-vertical-limitada">
                 <table class="insuseg-table" id="tabla-cartera">
                     <thead>
                         <tr>
                             <th class="col-sticky col-sticky-1">N°</th>
-                            <th class="col-sticky col-sticky-2">Cliente</th>
-                            @foreach (var mes in Model.Meses)
+                            <th class="col-sticky col-sticky-2 th-ordenable" data-sort-tipo="texto">Cliente</th>
+                            @foreach (var mes in mesesNormales)
                             {
-                                <th>@mes.Etiqueta</th>
+                                <th class="th-ordenable" data-sort-tipo="numero">@mes.Etiqueta</th>
                             }
-                            <th class="col-total">Total general</th>
-                            <th class="col-calc">Promedio Mes</th>
-                            <th class="col-calc">Peso Cliente</th>
-                            <th class="col-calc">% Cartera</th>
-                            <th class="col-calc">% MG</th>
+                            @if (Model.DesgloseMesActualDisponible)
+                            {
+                                <th class="th-ordenable col-mes-actual col-mes-actual-inicio" data-sort-tipo="numero" title="Facturas de @Model.MesActual?.Etiqueta — total: $@Model.FacturasMesActualTotal.ToString("N0")">
+                                    Facturas
+                                    <div class="th-total">$@Model.FacturasMesActualTotal.ToString("N0")</div>
+                                </th>
+                                <th class="th-ordenable col-mes-actual" data-sort-tipo="numero" title="Guías de despacho entregadas y aún no facturadas — TODO el historial pendiente, no solo @Model.MesActual?.Etiqueta — total: $@Model.GuiasMesActualTotal.ToString("N0")">
+                                    Guías
+                                    <div class="th-total">$@Model.GuiasMesActualTotal.ToString("N0")</div>
+                                </th>
+                                <th class="th-ordenable col-mes-actual" data-sort-tipo="numero" title="Facturas de @Model.MesActual?.Etiqueta + todas las Guías pendientes — total: $@Model.TotalMesActualTotal.ToString("N0")">
+                                    Total
+                                    <div class="th-total">$@Model.TotalMesActualTotal.ToString("N0")</div>
+                                </th>
+                                <th class="th-ordenable col-mes-actual col-mes-actual-fin" data-sort-tipo="numero" title="Total de @Model.MesActual?.Etiqueta ÷ venta neta de @(Model.MesAnioAnteriorEtiqueta ?? "el mismo mes, año anterior") — verde si va por encima del ritmo esperado del mes (@Model.RitmoEsperadoMesActualPct.ToString("N0")% de avance), rojo si va por debajo">% año ant.</th>
+                            }
+                            <th class="col-total th-ordenable orden-desc" data-sort-tipo="numero">Total general</th>
+                            <th class="col-calc th-ordenable" data-sort-tipo="numero">Promedio Mes</th>
+                            <th class="col-calc th-ordenable" data-sort-tipo="numero">Peso Cliente</th>
+                            <th class="col-calc th-ordenable" data-sort-tipo="numero">% Cartera</th>
+                            <th class="col-calc th-ordenable" data-sort-tipo="numero">% MG</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -202,16 +314,33 @@
                                         <span class="chip-vendedor">@c.Vendedor</span>
                                     </div>
                                 </td>
-                                @foreach (var mes in Model.Meses)
+                                @foreach (var mes in mesesNormales)
                                 {
                                     var monto = c.MontoPorMes.GetValueOrDefault((mes.Anio, mes.Mes));
-                                    <td>@(monto == 0 ? "—" : monto.ToString("N0"))</td>
+                                    <td data-valor="@monto.ToString(CultureInfo.InvariantCulture)">@(monto == 0 ? "—" : monto.ToString("N0"))</td>
                                 }
-                                <td class="col-total">@c.TotalGeneral.ToString("N0")</td>
-                                <td class="col-calc">@c.PromedioMes.ToString("N0")</td>
-                                <td class="col-calc">@c.PesoCliente.ToString("N0")%</td>
-                                <td class="col-calc">@c.PorcentajeCartera.ToString("N0")%</td>
-                                <td class="col-mg">@c.PorcentajeMargen.ToString("N0")%</td>
+                                @if (Model.DesgloseMesActualDisponible)
+                                {
+                                    <td class="col-mes-actual col-mes-actual-inicio" data-valor="@c.FacturasMesActual.ToString(CultureInfo.InvariantCulture)">@(c.FacturasMesActual == 0 ? "—" : c.FacturasMesActual.ToString("N0"))</td>
+                                    <td class="col-mes-actual" data-valor="@c.GuiasMesActual.ToString(CultureInfo.InvariantCulture)">@(c.GuiasMesActual == 0 ? "—" : c.GuiasMesActual.ToString("N0"))</td>
+                                    <td class="col-mes-actual col-mes-actual-total" data-valor="@c.TotalMesActual.ToString(CultureInfo.InvariantCulture)">@(c.TotalMesActual == 0 ? "—" : c.TotalMesActual.ToString("N0"))</td>
+                                    <td class="col-mes-actual col-mes-actual-fin" data-valor="@(c.PorcentajeVsAnioAnterior?.ToString(CultureInfo.InvariantCulture))">
+                                        @if (c.PorcentajeVsAnioAnterior is decimal pct)
+                                        {
+                                            var claseRitmo = pct >= Model.RitmoEsperadoMesActualPct ? "pct-ritmo-bueno" : "pct-ritmo-malo";
+                                            <span class="chip-ritmo @claseRitmo">@(pct.ToString("N0"))%</span>
+                                        }
+                                        else
+                                        {
+                                            @:—
+                                        }
+                                    </td>
+                                }
+                                <td class="col-total" data-valor="@c.TotalGeneral.ToString(CultureInfo.InvariantCulture)">@c.TotalGeneral.ToString("N0")</td>
+                                <td class="col-calc" data-valor="@c.PromedioMes.ToString(CultureInfo.InvariantCulture)">@c.PromedioMes.ToString("N0")</td>
+                                <td class="col-calc" data-valor="@c.PesoCliente.ToString(CultureInfo.InvariantCulture)">@c.PesoCliente.ToString("N0")%</td>
+                                <td class="col-calc" data-valor="@c.PorcentajeCartera.ToString(CultureInfo.InvariantCulture)">@c.PorcentajeCartera.ToString("N0")%</td>
+                                <td class="col-mg" data-valor="@c.PorcentajeMargen.ToString(CultureInfo.InvariantCulture)">@c.PorcentajeMargen.ToString("N0")%</td>
                             </tr>
                             <tr class="fila-detalle" data-detalle-de="@c.CardCode">
                                 <td colspan="@colspanDetalle"></td>
