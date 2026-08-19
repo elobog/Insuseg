@@ -75,13 +75,51 @@ public class SalesSyncService
         };
     }
 
-    private async Task<(int DocumentCount, int LineCount, DateOnly Since)> SincronizarFuenteAsync(
-        SalesSourceDocumentType type, int signo, bool forceFullResync, DateOnly until, CancellationToken ct)
+    // Backfill dirigido a un rango de fechas puntual — mismo upsert idempotente que el sync normal,
+    // pero sin recorrer todo el historial (forceFullResync) ni depender del watermark incremental.
+    // Pensado para reparar huecos puntuales como el del 2026-08-19 (78 facturas sin líneas entre
+    // 2026-08-07 y 2026-08-11, ver StageSalesUpsert) sin pagar los ~31 minutos de un reproceso
+    // completo — se le puede pedir a un rango tan angosto como haga falta.
+    public async Task<SalesSyncResult> BackfillRangeAsync(DateOnly since, DateOnly until, CancellationToken ct)
     {
-        var since = forceFullResync ? InitialBackfillStartDate : await GetSyncStartDateAsync(type, ct);
+        var (documentCount, lineCount, _) = await SincronizarFuenteAsync(_source, signo: 1, since, until, ct);
+        var (creditNoteDocumentCount, creditNoteLineCount, _) =
+            await SincronizarFuenteAsync(SalesSourceDocumentType.CreditNote, signo: -1, since, until, ct);
+
+        return new SalesSyncResult
+        {
+            Source = _source,
+            SalesPersonCount = 0,
+            DocumentCount = documentCount,
+            SaleLineCount = lineCount,
+            CreditNoteDocumentCount = creditNoteDocumentCount,
+            CreditNoteLineCount = creditNoteLineCount,
+            Since = since,
+            Until = until,
+        };
+    }
+
+    private async Task<(int DocumentCount, int LineCount, DateOnly Since)> SincronizarFuenteAsync(
+        SalesSourceDocumentType type, int signo, bool forceFullResync, DateOnly until, CancellationToken ct) =>
+        await SincronizarFuenteAsync(type, signo, forceFullResync ? InitialBackfillStartDate : await GetSyncStartDateAsync(type, ct), until, ct);
+
+    private async Task<(int DocumentCount, int LineCount, DateOnly Since)> SincronizarFuenteAsync(
+        SalesSourceDocumentType type, int signo, DateOnly since, DateOnly until, CancellationToken ct)
+    {
         var documents = await _sapClient.GetSalesDocumentsAsync(type, since, until, ct);
-        await UpsertSalesAsync(type, signo, documents, ct);
-        var lineCount = await UpsertSaleLinesAsync(type, signo, documents, ct);
+
+        // Cabecera y líneas se guardan en UN SOLO SaveChangesAsync (antes eran dos llamadas separadas)
+        // — hallazgo real (2026-08-19): si el proceso se caía entre medio de las dos (mismo colgón
+        // intermitente de SAP ya documentado, o cualquier corte), la cabecera quedaba guardada en
+        // Sales sin sus líneas en SaleLines, y como GetSyncStartDateAsync usa MAX(SaleDate) de Sales
+        // como watermark, esos documentos nunca se volvían a pedir — quedaban huérfanos para siempre.
+        // 78 facturas reales (\$47.307.903 con IVA) quedaron así entre el 2026-08-07 y el 2026-08-11,
+        // afectando el total neto de Cartera para varios vendedores sin que nada avisara. Ahora ambos
+        // upserts solo modifican el ChangeTracker; el guardado real es atómico al final de este método.
+        await StageSalesUpsert(type, signo, documents);
+        var lineCount = await StageSaleLinesUpsert(type, signo, documents);
+        await _db.SaveChangesAsync(ct);
+
         return (documents.Count, lineCount, since);
     }
 
@@ -119,8 +157,13 @@ public class SalesSyncService
     // signo = 1 para ventas normales, -1 para notas de crédito — así Amount/LineTotal/Quantity quedan
     // negativos en la base y cualquier .Sum() existente (Cartera, Análisis, rotación de Inventario) los
     // neta automáticamente, sin tener que filtrar por SourceDocType en cada consulta.
-    private async Task UpsertSalesAsync(
-        SalesSourceDocumentType type, int signo, IReadOnlyList<SapSalesDocumentDto> documents, CancellationToken ct)
+    //
+    // "Stage": solo agrega/actualiza entidades en el ChangeTracker de EF Core, sin guardar — el guardado
+    // real (SaveChangesAsync) lo hace SincronizarFuenteAsync una sola vez, junto con StageSaleLinesUpsert,
+    // para que cabecera y líneas queden en la misma transacción (ver comentario ahí sobre el bug real
+    // que esto corrige).
+    private async Task StageSalesUpsert(
+        SalesSourceDocumentType type, int signo, IReadOnlyList<SapSalesDocumentDto> documents)
     {
         if (documents.Count == 0)
         {
@@ -130,7 +173,7 @@ public class SalesSyncService
         var docEntries = documents.Select(d => d.DocEntry).ToList();
         var existing = await _db.Sales
             .Where(s => s.SourceDocType == type && docEntries.Contains(s.DocEntry))
-            .ToDictionaryAsync(s => s.DocEntry, ct);
+            .ToDictionaryAsync(s => s.DocEntry);
 
         foreach (var dto in documents)
         {
@@ -158,12 +201,11 @@ public class SalesSyncService
                 });
             }
         }
-
-        await _db.SaveChangesAsync(ct);
     }
 
-    private async Task<int> UpsertSaleLinesAsync(
-        SalesSourceDocumentType type, int signo, IReadOnlyList<SapSalesDocumentDto> documents, CancellationToken ct)
+    // Mismo patrón "Stage" que StageSalesUpsert de arriba — ver ese comentario.
+    private async Task<int> StageSaleLinesUpsert(
+        SalesSourceDocumentType type, int signo, IReadOnlyList<SapSalesDocumentDto> documents)
     {
         if (documents.Count == 0)
         {
@@ -173,7 +215,7 @@ public class SalesSyncService
         var docEntries = documents.Select(d => d.DocEntry).ToList();
         var existing = await _db.SaleLines
             .Where(l => l.SourceDocType == type && docEntries.Contains(l.DocEntry))
-            .ToDictionaryAsync(l => (l.DocEntry, l.LineNum), ct);
+            .ToDictionaryAsync(l => (l.DocEntry, l.LineNum));
 
         var lineCount = 0;
         foreach (var doc in documents)
@@ -208,7 +250,6 @@ public class SalesSyncService
             }
         }
 
-        await _db.SaveChangesAsync(ct);
         return lineCount;
     }
 }
