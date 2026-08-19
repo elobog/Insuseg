@@ -92,8 +92,16 @@ app.MapRazorPages();
 // IdentityDbContext<ApplicationUser> ya incluye AspNetRoles/AspNetUserRoles con IdentityRole por
 // defecto). Admin es el único rol que puede crear/borrar cuentas (ver Usuarios.cshtml.cs); las
 // dos cuentas del equipo ya existentes quedan como Admin al arrancar si todavía no lo son.
-using (var scope = app.Services.CreateScope())
+//
+// Con try/catch a propósito (2026-08-19): antes, cualquier error acá (p.ej. la base tardando en
+// "despertar" del auto-pausado de Serverless en el primer arranque tras estar inactiva) tumbaba
+// TODA la app sin dejar ningún mensaje útil en el log — Azure App Service on Linux mata el proceso
+// entero (SIGABRT) ante una excepción no capturada en Main. Ahora se registra el error completo y
+// la app sigue levantando igual — el sembrado de roles es idempotente, si falla una vez se reintenta
+// solo en el próximo arranque/redeploy, no hace falta que bloquee el sitio completo.
+try
 {
+    using var scope = app.Services.CreateScope();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
@@ -113,6 +121,10 @@ using (var scope = app.Services.CreateScope())
             await userManager.AddToRoleAsync(user, "Admin");
         }
     }
+}
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "Falló el sembrado de roles/admins al arrancar — la app sigue levantando igual.");
 }
 
 app.Run();
