@@ -59,7 +59,8 @@ public class SincronizacionModel : PageModel
             {
                 var guias = await _deliveryNoteSyncService.SyncAsync(ct);
                 SyncSummary = $"{resumenVentas} Guías de despacho sin facturar: {guias.OpenCount} " +
-                    $"({guias.RealCount} venta real, {guias.OpenCount - guias.RealCount} muestra/cambio/etc — " +
+                    $"({guias.RealCount} venta real, {guias.OpenCount - guias.RealCount} muestra/cambio/etc, " +
+                    $"{guias.LineCount} líneas pendientes de facturar — " +
                     $"{guias.RemovedCount} removidas por facturarse/cancelarse desde la última sincronización).";
             }
             catch (Exception exGuias)

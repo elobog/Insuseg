@@ -1,8 +1,9 @@
 namespace Insuseg.Analytics.Data.Sap;
 
-// Guía de despacho (DeliveryNotes) — ver BDhana.md sección 8b. Solo cabecera, sin líneas: este
-// proyecto usa DeliveryNotes únicamente para saber qué guías de venta real siguen sin facturar, no
-// necesita el detalle de producto por línea.
+// Guía de despacho (DeliveryNotes) — ver BDhana.md sección 8b. Incluye DocumentLines: el monto
+// pendiente real de facturar se calcula por línea (LineStatus, piso de $1.000), no por el DocTotal
+// de la cabecera — ver la fórmula validada contra el cliente en Insuseg.md (2026-08-14/16) y
+// DeliveryNoteSyncService.
 public class SapDeliveryNoteDto
 {
     public int DocEntry { get; set; }
@@ -14,4 +15,5 @@ public class SapDeliveryNoteDto
     public int? SalesPersonCode { get; set; }
     public string? Comments { get; set; }
     public string? NumAtCard { get; set; }
+    public List<SapDocumentLineDto> DocumentLines { get; set; } = [];
 }

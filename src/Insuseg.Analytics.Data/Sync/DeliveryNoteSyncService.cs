@@ -25,6 +25,14 @@ public class DeliveryNoteSyncService
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private const decimal MontoMinimoVentaReal = 1000m;
 
+    // Piso de monto POR LÍNEA (distinto de MontoMinimoVentaReal, que es sobre el DocTotal de la
+    // cabecera) — mismo valor, pero es la fórmula validada contra la tabla real del cliente el
+    // 2026-08-16 (6 de 7 vendedores exactos, ver Insuseg.md): una línea solo cuenta como pendiente de
+    // facturar si LineStatus='bost_Open' (la cabecera puede seguir "abierta" con otras líneas ya
+    // facturadas), el documento entero no es muestra/cambio/etc por texto, y LineTotal ≥ este piso.
+    private const decimal MontoMinimoLineaReal = 1000m;
+    private const string EstadoLineaAbierta = "bost_Open";
+
     private readonly SapServiceLayerClient _sapClient;
     private readonly InsusegAnalyticsDbContext _db;
     private readonly ILogger<DeliveryNoteSyncService> _logger;
@@ -78,19 +86,71 @@ public class DeliveryNoteSyncService
         var aBorrar = existentes.Values.Where(e => !docEntriesAbiertos.Contains(e.DocEntry)).ToList();
         _db.DeliveryNotes.RemoveRange(aBorrar);
 
+        // DeliveryNoteLines es igual de "foto del momento" que DeliveryNotes, así que se reemplaza
+        // completo en cada corrida (no hay FK/cascada real entre las dos tablas — confirmado contra
+        // sys.foreign_keys — así que sin este borrado explícito las líneas de guías ya facturadas o
+        // canceladas quedarían huérfanas para siempre). Se reconstruye desde cero en vez de intentar
+        // upsert línea por línea porque LineStatus puede pasar de abierta a cerrada sin que cambie
+        // ningún otro dato de la línea — más simple y más barato que diffear.
+        var lineasExistentes = await _db.DeliveryNoteLines.ToListAsync(ct);
+        _db.DeliveryNoteLines.RemoveRange(lineasExistentes);
+
+        var lineasReales = 0;
+        foreach (var dto in abiertas)
+        {
+            if (EsTextoNoVenta(dto))
+            {
+                continue;
+            }
+
+            foreach (var linea in dto.DocumentLines)
+            {
+                if (linea.LineStatus != EstadoLineaAbierta || linea.LineTotal < MontoMinimoLineaReal)
+                {
+                    continue;
+                }
+
+                _db.DeliveryNoteLines.Add(new DeliveryNoteLine
+                {
+                    DocEntry = dto.DocEntry,
+                    LineNum = linea.LineNum,
+                    ItemCode = linea.ItemCode,
+                    Quantity = linea.Quantity,
+                    LineTotal = linea.LineTotal,
+                    SalesPersonCode = linea.SalesPersonCode,
+                });
+                lineasReales++;
+            }
+        }
+
         await _db.SaveChangesAsync(ct);
 
         var reales = abiertas.Count(d => !EsMuestraOCambio(d));
         _logger.LogInformation(
-            "Sincronización de guías de despacho completa: {OpenCount} abiertas ({RealCount} venta real), " +
-            "{RemovedCount} removidas (ya facturadas/canceladas).",
-            abiertas.Count, reales, aBorrar.Count);
+            "Sincronización de guías de despacho completa: {OpenCount} abiertas ({RealCount} venta real, " +
+            "{LineCount} líneas pendientes de facturar), {RemovedCount} removidas (ya facturadas/canceladas).",
+            abiertas.Count, reales, lineasReales, aBorrar.Count);
 
-        return new DeliveryNoteSyncResult { OpenCount = abiertas.Count, RealCount = reales, RemovedCount = aBorrar.Count };
+        return new DeliveryNoteSyncResult
+        {
+            OpenCount = abiertas.Count,
+            RealCount = reales,
+            RemovedCount = aBorrar.Count,
+            LineCount = lineasReales,
+        };
     }
 
-    private static bool EsMuestraOCambio(SapDeliveryNoteDto dto) =>
+    // Filtro de texto a nivel de documento (Comments/NumAtCard) — SIN el piso de DocTotal, a
+    // diferencia de EsMuestraOCambio: el piso real que importa para "Guías" es por línea
+    // (MontoMinimoLineaReal, ver más abajo), no por el total del documento completo.
+    private static bool EsTextoNoVenta(SapDeliveryNoteDto dto) =>
         (dto.Comments is not null && PatronNoVenta.IsMatch(dto.Comments)) ||
-        (dto.NumAtCard is not null && PatronNoVenta.IsMatch(dto.NumAtCard)) ||
-        dto.DocTotal < MontoMinimoVentaReal;
+        (dto.NumAtCard is not null && PatronNoVenta.IsMatch(dto.NumAtCard));
+
+    // Clasificación que se guarda en DeliveryNote.EsMuestraOCambio (informativa, para el resumen del
+    // botón "Sincronizar ahora") — combina el filtro de texto con el piso sobre el DocTotal de la
+    // cabecera. Distinta del criterio de línea (EsTextoNoVenta + MontoMinimoLineaReal) que decide qué
+    // entra a DeliveryNoteLines — ver Insuseg.md 2026-08-16 sobre por qué son dos pisos separados.
+    private static bool EsMuestraOCambio(SapDeliveryNoteDto dto) =>
+        EsTextoNoVenta(dto) || dto.DocTotal < MontoMinimoVentaReal;
 }

@@ -106,13 +106,15 @@ public class SapServiceLayerClient : IAsyncDisposable
 
     // Guías de despacho SIN facturar (DocumentStatus abierto, no canceladas) — ver BDhana.md sección
     // 8b. A propósito no se filtra por fecha: no nos interesa el historial, solo el estado actual, y
-    // "abiertas" ya acota el volumen (cientos, no miles) sin necesitar una ventana de tiempo.
+    // "abiertas" ya acota el volumen (cientos, no miles) sin necesitar una ventana de tiempo. Incluye
+    // DocumentLines (mismo patrón que GetSalesDocumentsAsync) porque el monto real pendiente de
+    // facturar se calcula por línea, no por DocTotal de la cabecera — ver DeliveryNoteSyncService.
     public async Task<List<SapDeliveryNoteDto>> GetOpenDeliveryNotesAsync(CancellationToken ct)
     {
         await EnsureLoggedInAsync(ct);
         var filter = Uri.EscapeDataString("DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'");
         return await GetAllPagesAsync<SapDeliveryNoteDto>(
-            $"DeliveryNotes?$select=DocEntry,DocNum,DocDate,DocTotal,CardCode,CardName,SalesPersonCode,Comments,NumAtCard&$filter={filter}&$orderby=DocEntry",
+            $"DeliveryNotes?$select=DocEntry,DocNum,DocDate,DocTotal,CardCode,CardName,SalesPersonCode,Comments,NumAtCard,DocumentLines&$filter={filter}&$orderby=DocEntry",
             ct);
     }
 
