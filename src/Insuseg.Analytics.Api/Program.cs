@@ -16,9 +16,14 @@ builder.Services.AddRazorPages();
 builder.Services.AddDbContext<InsusegAnalyticsDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("InsusegAnalyticsDb"),
-        // sqldb-insuseg-analytics es Serverless con auto-pausa (free tier) — la primera conexión tras
-        // un período inactivo puede agotar el tiempo de espera mientras la base "despierta".
-        sqlOptions => sqlOptions.EnableRetryOnFailure()));
+        // sqldb-insuseg-analytics es Serverless con auto-pausa — la primera conexión tras un período
+        // inactivo NO espera sola, falla directo con el error transitorio 40613 ("Database ... is not
+        // currently available") mientras la base despierta (confirmado en vivo, 2026-08-19: tardó
+        // ~2-3 minutos completos en pasar de Paused a Online). El valor por defecto de
+        // EnableRetryOnFailure (6 reintentos, tope de 30s cada uno) no siempre alcanza a cubrir esa
+        // espera — de ahí los 500 esporádicos que veía el cliente. Con estos valores el presupuesto
+        // total de reintentos cubre varios minutos, suficiente para un ciclo de resume completo.
+        sqlOptions => sqlOptions.EnableRetryOnFailure(maxRetryCount: 10, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null)));
 
 // Endpoints /register, /login, /refresh, etc. vía ASP.NET Core Identity — ver Insuseg.md sección 2.
 // También registra el esquema de cookie ("Identity.Application") que usan las páginas Razor del
