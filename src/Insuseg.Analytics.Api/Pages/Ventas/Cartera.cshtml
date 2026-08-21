@@ -51,17 +51,6 @@
 }
 <div class="insuseg-container">
     <h1>Cartera de clientes</h1>
-    <p class="insuseg-subtitle">
-        @if (Model.EsVendedorRestringido)
-        {
-            <text>Tu cartera de clientes. </text>
-        }
-        else
-        {
-            <text>Ventas mensuales por cliente. </text>
-        }
-        Hacé clic en un cliente para ver el detalle por categoría de producto, y en una categoría para ver sus productos.
-    </p>
 
     @if (Model.VendedorSinAsignar)
     {
@@ -94,35 +83,47 @@
     </form>
 
     <div class="insuseg-kpi-row">
-        <div class="insuseg-kpi">
-            <div class="insuseg-kpi-label">Venta total del período</div>
-            <div class="insuseg-kpi-value">$@Model.VentaTotalPeriodo.ToString("N0")</div>
-            <div class="insuseg-kpi-label" style="margin-top:0.6rem">Margen total del período</div>
-            <div class="insuseg-kpi-value">$@Model.MargenTotalPeriodo.ToString("N0")</div>
-            <div class="insuseg-kpi-highlight">@Model.PorcentajeMargenPeriodo.ToString("N1") % Mg</div>
-        </div>
-        <div class="insuseg-kpi">
-            <div class="insuseg-kpi-label">Venta promedio por mes</div>
-            <div class="insuseg-kpi-value">$@Model.VentaPromedioMes.ToString("N0")</div>
-            <div class="insuseg-kpi-sub">excluye @(Model.MesActual?.Etiqueta ?? "—") (mes en curso)</div>
-        </div>
-        <div class="insuseg-kpi">
-            <div class="insuseg-kpi-label">Venta del mes actual (@(Model.MesActual?.Etiqueta ?? "—"))</div>
-            <div class="insuseg-kpi-value">$@Model.VentaMesActual.ToString("N0")</div>
-        </div>
-        <div class="insuseg-kpi">
-            <div class="insuseg-kpi-label">Margen del mes actual (@(Model.MesActual?.Etiqueta ?? "—"))</div>
-            <div class="insuseg-kpi-value">$@Model.MargenMesActual.ToString("N0")</div>
-            <div class="insuseg-kpi-highlight">@Model.PorcentajeMargenMesActual.ToString("N1") % Mg</div>
-        </div>
-        <div class="insuseg-kpi @(Model.DiferenciaAnioAnterior > 0 ? "kpi-bad" : "kpi-good")">
-            <div class="insuseg-kpi-label">Comparado con @(Model.MesAnioAnteriorEtiqueta ?? "—") (año anterior)</div>
-            <div class="insuseg-kpi-value">
+        <div class="insuseg-kpi-hero">
+            <div class="insuseg-kpi-hero-label">Venta del mes actual (@(Model.MesActual?.Etiqueta ?? "—"))</div>
+            <div class="insuseg-kpi-hero-valor">$@Model.VentaMesActual.ToString("N0")</div>
+            <div class="insuseg-kpi-hero-delta">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    @if (Model.DiferenciaAnioAnterior > 0)
+                    {
+                        <path d="M8 3V13M8 13L3.5 8.5M8 13L12.5 8.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    }
+                    else
+                    {
+                        <path d="M8 13V3M8 3L3.5 7.5M8 3L12.5 7.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    }
+                </svg>
                 @(Model.DiferenciaAnioAnterior > 0
-                    ? $"Faltan ${Model.DiferenciaAnioAnterior.ToString("N0")}"
-                    : $"Superado por ${Math.Abs(Model.DiferenciaAnioAnterior).ToString("N0")}")
+                    ? $"Faltan ${Model.DiferenciaAnioAnterior.ToString("N0")} vs {Model.MesAnioAnteriorEtiqueta ?? "—"}"
+                    : $"Superado por ${Math.Abs(Model.DiferenciaAnioAnterior).ToString("N0")} vs {Model.MesAnioAnteriorEtiqueta ?? "—"}")
             </div>
-            <div class="insuseg-kpi-sub">$@Model.VentaMesAnioAnterior.ToString("N0") vendido en @(Model.MesAnioAnteriorEtiqueta ?? "—")</div>
+            <div class="insuseg-kpi-hero-sub">$@Model.VentaMesAnioAnterior.ToString("N0") vendido en @(Model.MesAnioAnteriorEtiqueta ?? "—")</div>
+        </div>
+
+        <div class="insuseg-kpi-secundarias">
+            <div class="insuseg-kpi-mini">
+                <div class="insuseg-kpi-mini-label">Venta total del período</div>
+                <div class="insuseg-kpi-mini-valor">$@Model.VentaTotalPeriodo.ToString("N0")</div>
+            </div>
+            <div class="insuseg-kpi-mini">
+                <div class="insuseg-kpi-mini-label">Margen total del período</div>
+                <div class="insuseg-kpi-mini-valor">$@Model.MargenTotalPeriodo.ToString("N0")</div>
+                <div class="insuseg-kpi-mini-highlight">@Model.PorcentajeMargenPeriodo.ToString("N1") % Mg</div>
+            </div>
+            <div class="insuseg-kpi-mini">
+                <div class="insuseg-kpi-mini-label">Venta promedio por mes</div>
+                <div class="insuseg-kpi-mini-valor">$@Model.VentaPromedioMes.ToString("N0")</div>
+                <div class="insuseg-kpi-mini-sub">excluye @(Model.MesActual?.Etiqueta ?? "—") (mes en curso)</div>
+            </div>
+            <div class="insuseg-kpi-mini">
+                <div class="insuseg-kpi-mini-label">Margen del mes actual (@(Model.MesActual?.Etiqueta ?? "—"))</div>
+                <div class="insuseg-kpi-mini-valor">$@Model.MargenMesActual.ToString("N0")</div>
+                <div class="insuseg-kpi-mini-highlight">@Model.PorcentajeMargenMesActual.ToString("N1") % Mg</div>
+            </div>
         </div>
     </div>
 

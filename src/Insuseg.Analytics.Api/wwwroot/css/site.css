@@ -249,45 +249,104 @@ table.insuseg-table tr:nth-child(even) {
     margin-bottom: 0;
 }
 
-/* KPIs: fila de "stat tiles" — label + valor grande, sin gráfico. */
+/* KPIs de Cartera: un hero (venta del mes actual, con la comparación contra el año anterior ya
+   integrada adentro — flecha + texto, nunca solo color) más una grilla 2x2 de datos de apoyo más
+   chicos. Reemplaza la fila de 5 tarjetas con el mismo peso visual — el mes en curso es el dato que
+   más se consulta, así que es el único con protagonismo propio (ver Insuseg.md, 2026-08-21). */
 .insuseg-kpi-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    display: flex;
     gap: 1rem;
+    align-items: stretch;
     margin-bottom: 1.5rem;
 }
 
-.insuseg-kpi {
-    background: #fff;
+.insuseg-kpi-hero {
+    flex: 0 0 320px;
+    background: var(--insuseg-orange);
+    color: #fff;
+    padding: 1.6rem 1.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.insuseg-kpi-hero-label {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.85);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.5rem;
+}
+
+.insuseg-kpi-hero-valor {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 0.75rem;
+}
+
+.insuseg-kpi-hero-delta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.insuseg-kpi-hero-delta svg {
+    flex-shrink: 0;
+}
+
+.insuseg-kpi-hero-sub {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin-top: 0.25rem;
+}
+
+.insuseg-kpi-secundarias {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    background: var(--insuseg-gray-light);
     border: 1px solid var(--insuseg-gray-light);
-    padding: 1.1rem 1.25rem;
 }
 
-.insuseg-kpi .insuseg-kpi-label {
-    font-size: 0.8rem;
+.insuseg-kpi-mini {
+    background: #fff;
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+.insuseg-kpi-mini-label {
+    font-size: 0.75rem;
     color: #696969;
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.3rem;
 }
 
-.insuseg-kpi .insuseg-kpi-value {
-    font-size: 1.6rem;
+.insuseg-kpi-mini-valor {
+    font-size: 1.15rem;
     font-weight: 700;
     color: var(--insuseg-dark);
+    overflow-wrap: break-word;
 }
 
-.insuseg-kpi .insuseg-kpi-sub {
+.insuseg-kpi-mini-highlight {
     font-size: 0.78rem;
-    color: #969696;
+    font-weight: 700;
+    color: var(--insuseg-orange);
     margin-top: 0.2rem;
 }
 
-/* Variante para un dato secundario que sí debe destacar (ej. % de margen) — más grande que
-   insuseg-kpi-sub y en el naranja de marca, en vez de gris apagado. */
-.insuseg-kpi .insuseg-kpi-highlight {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--insuseg-orange);
-    margin-top: 0.25rem;
+.insuseg-kpi-mini-sub {
+    font-size: 0.7rem;
+    color: #969696;
+    margin-top: 0.2rem;
 }
 
 /* Gráfico de barras horizontal, en HTML/CSS plano (no librería):
@@ -346,6 +405,19 @@ table.insuseg-table tr:nth-child(even) {
         grid-template-columns: 1fr;
     }
 
+    .insuseg-kpi-row {
+        flex-direction: column;
+    }
+
+    .insuseg-kpi-hero {
+        flex: none;
+    }
+
+    .insuseg-kpi-secundarias {
+        grid-template-columns: 1fr;
+        grid-template-rows: none;
+    }
+
     .insuseg-app {
         flex-direction: column;
     }
@@ -357,21 +429,7 @@ table.insuseg-table tr:nth-child(even) {
     }
 }
 
-/* KPI con signo — reutiliza insuseg-kpi, solo cambia el color del valor. */
-.insuseg-kpi.kpi-bad .insuseg-kpi-value {
-    color: var(--insuseg-orange-dark);
-}
-
-.insuseg-kpi.kpi-good .insuseg-kpi-value {
-    color: #2f7a3d;
-}
-
 /* Ventas > Cartera de clientes: tabla dinámica por mes con detalle de producto expandible. */
-.insuseg-subtitle {
-    color: #696969;
-    font-size: 0.92rem;
-    margin: 0 0 1.5rem;
-}
 
 .detalle-nota {
     color: #696969;
