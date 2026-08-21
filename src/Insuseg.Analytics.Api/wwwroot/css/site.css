@@ -551,8 +551,11 @@ table.insuseg-table th.col-mes-actual .th-total {
     background: #b23b2e;
 }
 
-/* .fila-categoria es el mismo patrón fila-clic-para-expandir que .fila-cliente, un nivel más abajo
-   (categoría de producto, dentro del detalle de un cliente en Cartera) — comparte look y comportamiento. */
+/* Categoría y producto (dentro de Cartera) ya no son mini-tablas anidadas con su propio recuadro y
+   scroll — son filas de esta MISMA tabla, insertadas después de su padre con sangría (ver Insuseg.md,
+   2026-08-21: la estructura anidada era la causa real de que "maniobrar" se sintiera incómodo al bajar
+   de nivel). .fila-categoria sigue siendo clicable (expande a productos); .fila-producto es hoja, sin
+   comportamiento de clic. */
 .fila-cliente,
 .fila-categoria {
     cursor: pointer;
@@ -566,10 +569,20 @@ table.insuseg-table th.col-mes-actual .th-total {
 }
 
 /* Columnas fijas al scrollear horizontalmente (N° y Cliente) — el fondo se hereda de la fila para que
-   siga la franja cebra/hover/expandida en vez de quedar siempre blanco. */
-table.insuseg-table tbody tr,
-table.insuseg-table-mini tbody tr {
+   siga el tinte de cada nivel (o el hover/expandida de arriba) en vez de quedar siempre blanco. La
+   especificidad de estas dos reglas de nivel tiene que igualar a la de abajo (mismo selector largo)
+   para poder pisarla. */
+table.insuseg-table tbody tr {
     background: #fff;
+}
+
+table.insuseg-table tbody tr.fila-categoria {
+    background: #fcfcfc;
+}
+
+table.insuseg-table tbody tr.fila-producto {
+    background: #fbfbfb;
+    color: #4a4a4a;
 }
 
 .col-sticky {
@@ -589,17 +602,55 @@ table.insuseg-table-mini tbody tr {
     box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.2);
 }
 
-/* Tabla mini de detalle por producto: una sola columna fija (Producto), sin columna de N° al lado. */
-.col-sticky-solo {
-    left: 0;
-    min-width: 180px;
-    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.2);
-}
-
 .nombre-cliente {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+/* Sangría de categoría/producto — la línea vertical fina conecta cada fila con su padre, mismo
+   criterio de "outline de árbol" que un explorador de archivos. El pseudo-elemento se estira un poco
+   más allá de la propia caja (top/bottom negativos) para simular una línea continua entre filas
+   consecutivas, ya que cada fila la dibuja por separado. */
+.nombre-nivel1,
+.nombre-nivel2 {
+    position: relative;
+}
+
+.nombre-nivel1 {
+    padding-left: 22px;
+    font-weight: 600;
+    font-size: 0.86rem;
+}
+
+.nombre-nivel2 {
+    padding-left: 44px;
+    font-weight: 400;
+    font-size: 0.84rem;
+}
+
+.nombre-nivel1::before,
+.nombre-nivel2::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: -0.6rem;
+    bottom: -0.6rem;
+    width: 1px;
+    background: var(--insuseg-gray-light);
+}
+
+.nombre-nivel2::before {
+    left: 32px;
+}
+
+.banda-nivel {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #969696;
+    white-space: nowrap;
 }
 
 .chevron {
@@ -607,6 +658,12 @@ table.insuseg-table-mini tbody tr {
     color: var(--insuseg-orange);
     font-size: 0.7rem;
     transition: transform 0.15s ease;
+}
+
+/* Fila hoja (producto) — no expande nada, el chevron queda reservado para que el nombre no salte de
+   posición según el nivel, pero invisible (no es un botón). */
+.chevron-hoja {
+    visibility: hidden;
 }
 
 .fila-cliente.expandida .chevron,
@@ -623,60 +680,13 @@ table.insuseg-table-mini tbody tr {
     white-space: nowrap;
 }
 
-.fila-detalle {
-    display: none;
-}
-
-.fila-detalle.abierta {
-    display: table-row;
-}
-
-.fila-detalle td {
-    padding: 0;
-    background: var(--insuseg-gray-bg);
-    /* Sin esto, una tabla mini ancha (muchos meses) estira TODA la tabla externa para acomodarla
-       en vez de scrollear puertas adentro — width:0 le saca a esta celda "colspan" el peso en el
-       cálculo de ancho de la tabla, dejando que las filas normales lo determinen. */
-    width: 0;
-}
-
-.detalle-wrap {
-    padding: 1.25rem 1.5rem 1.5rem 2.75rem;
-}
-
-.detalle-header {
-    margin-bottom: 0.4rem;
-}
-
-.detalle-header h3 {
-    margin: 0;
-    font-size: 0.95rem;
-}
-
-table.insuseg-table-mini {
-    width: 100%;
-    /* separate, no collapse — mismo motivo que .insuseg-table (ver ese comentario). */
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: 0.82rem;
-    background: #fff;
-}
-
-table.insuseg-table-mini th {
-    background: #4a4a4a;
-    color: #fff;
-    text-align: left;
-    padding: 0.45rem 0.6rem;
-    font-weight: 600;
-}
-
-table.insuseg-table-mini td {
-    padding: 0.42rem 0.6rem;
-    border-bottom: 1px solid var(--insuseg-gray-light);
-}
-
-table.insuseg-table-mini tr:nth-child(even) {
-    background: var(--insuseg-gray-bg);
+/* Fila de "Cargando…" / mensaje de error / vacío — sola, sin clic, mientras se resuelve el fetch de
+   categorías o productos de un cliente/categoría. */
+.fila-estado-texto {
+    padding: 0.6rem 0.75rem;
+    color: #696969;
+    font-size: 0.85rem;
+    font-style: italic;
 }
 
 .nota-sin-limite {

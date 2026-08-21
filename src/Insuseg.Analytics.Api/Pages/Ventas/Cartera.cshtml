@@ -10,8 +10,6 @@
     // Cartera.cshtml.cs para el porqué. Si no, el último mes se trata como uno más.
     // mesesNormales es la misma lista para el thead y el tbody (un mes menos cuando hay desglose).
     var mesesNormales = Model.DesgloseMesActualDisponible ? Model.Meses.Take(Model.Meses.Count - 1) : Model.Meses;
-    // +10 (2 columnas fijas + 5 de siempre + 4 en vez de 1 = +3 extra) con desglose; +7 sin él.
-    var colspanDetalle = Model.Meses.Count + (Model.DesgloseMesActualDisponible ? 10 : 7);
 
     // Geometría del gráfico de tendencia — se calcula acá (no en el PageModel) porque es puramente de
     // presentación: coordenadas SVG, no datos de negocio.
@@ -239,8 +237,8 @@
     <div class="insuseg-card">
         <h2 style="margin-top:0">Ventas por cliente</h2>
         <p class="detalle-nota">
-            Montos netos (sin IVA). <strong>Peso Cliente</strong> = ÷ total de todos los clientes.
-            <strong>% Cartera</strong> = ÷ total de su vendedor (chip junto al nombre).
+            Montos netos (sin IVA). <strong>Peso</strong> = ÷ total del nivel de arriba (de todos los clientes; de las categorías del cliente; de los productos de la categoría).
+            <strong>% Cartera</strong>: en un cliente, ÷ total de su vendedor (chip junto al nombre); en categoría/producto, ÷ total vendido de esa categoría/producto a todos los clientes.
         </p>
         @if (Model.DesgloseMesActualDisponible)
         {
@@ -290,7 +288,7 @@
                             }
                             <th class="col-total th-ordenable orden-desc" data-sort-tipo="numero">Total general</th>
                             <th class="col-calc th-ordenable" data-sort-tipo="numero">Promedio Mes</th>
-                            <th class="col-calc th-ordenable" data-sort-tipo="numero">Peso Cliente</th>
+                            <th class="col-calc th-ordenable" data-sort-tipo="numero">Peso</th>
                             <th class="col-calc th-ordenable" data-sort-tipo="numero">% Cartera</th>
                             <th class="col-calc th-ordenable" data-sort-tipo="numero">% MG</th>
                         </tr>
@@ -336,9 +334,6 @@
                                 <td class="col-calc" data-valor="@c.PesoCliente.ToString(CultureInfo.InvariantCulture)">@c.PesoCliente.ToString("N0")%</td>
                                 <td class="col-calc" data-valor="@c.PorcentajeCartera.ToString(CultureInfo.InvariantCulture)">@c.PorcentajeCartera.ToString("N0")%</td>
                                 <td class="col-mg" data-valor="@c.PorcentajeMargen.ToString(CultureInfo.InvariantCulture)">@c.PorcentajeMargen.ToString("N0")%</td>
-                            </tr>
-                            <tr class="fila-detalle" data-detalle-de="@c.CardCode">
-                                <td colspan="@colspanDetalle"></td>
                             </tr>
                         }
                     </tbody>

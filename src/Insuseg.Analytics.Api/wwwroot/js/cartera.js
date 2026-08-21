@@ -2,25 +2,280 @@ document.addEventListener('DOMContentLoaded', function () {
     var tabla = document.getElementById('tabla-cartera');
     if (!tabla) return;
 
-    // Dos niveles de detalle, cada uno con su propio caché: categorías por cliente, y productos por
-    // (cliente, categoría). Todo se construye con el DOM (createElement/textContent), no strings HTML
-    // concatenados — los nombres de categoría/producto son datos, no confían en no traer comillas.
-    var cacheCategorias = {};
-    var cacheProductos = {};
+    var thead = tabla.querySelector('thead');
+    var tbody = tabla.querySelector('tbody');
     var formateador = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
 
-    tabla.querySelectorAll('.fila-cliente').forEach(function (fila) {
-        fila.addEventListener('click', function () {
-            var cardCode = fila.dataset.cardCode;
-            var filaDetalle = tabla.querySelector('[data-detalle-de="' + cardCode + '"]');
-            var abierta = fila.classList.toggle('expandida');
-            filaDetalle.classList.toggle('abierta', abierta);
+    // Árbol de tres niveles (cliente → categoría → producto) en UNA sola tabla — categoría y producto
+    // ya no son mini-tablas con su propio recuadro/scroll adentro de la fila (ver Insuseg.md, 2026-08-21:
+    // esa estructura anidada era justo lo que hacía "incómodo maniobrar" al bajar de nivel). Ahora cada
+    // categoría/producto es una fila más del MISMO <tbody>, insertada justo después de su padre, con
+    // sangría — así solo hay un scroll (el de toda la tabla) en vez de uno adentro de otro.
+    //
+    // Por construcción, el "bloque" de un cliente es esa fila más TODOS los <tr> siguientes hasta el
+    // próximo '.fila-cliente' (o el final de la tabla) — nunca se insertan filas hijas en otro lugar,
+    // así que no hace falta ningún índice/mapa aparte para encontrarlas.
+    var cacheCategorias = {};
+    var cacheProductos = {};
 
-            if (abierta && !cacheCategorias[cardCode]) {
-                cargarCategorias(cardCode, fila, filaDetalle);
-            }
-        });
+    // --- Cuántas columnas tiene la tabla (para el colspan de "Cargando…"/vacío) y si el mes actual
+    //     está desglosado en las 4 columnas Facturas/Guías/Total/% año ant. — leído del propio <thead>,
+    //     no hardcodeado, así sigue funcionando si el desglose se prende/apaga según el filtro. ---
+    var totalColumnas = thead.querySelectorAll('th').length;
+    var desgloseActivo = !!thead.querySelector('th.col-mes-actual');
+
+    function colspanFila() {
+        return totalColumnas;
+    }
+
+    // --- Expandir/colapsar cliente (nivel 0) ---
+    tabla.addEventListener('click', function (evento) {
+        var filaCliente = evento.target.closest('.fila-cliente');
+        if (filaCliente) {
+            alternarCliente(filaCliente);
+            return;
+        }
+        var filaCategoria = evento.target.closest('.fila-categoria');
+        if (filaCategoria) {
+            alternarCategoria(filaCategoria);
+        }
     });
+
+    function alternarCliente(filaCliente) {
+        var cardCode = filaCliente.dataset.cardCode;
+        var abierta = filaCliente.classList.toggle('expandida');
+
+        if (abierta && !cacheCategorias[cardCode]) {
+            var filaCarga = crearFilaCargando();
+            filaCliente.after(filaCarga);
+            cargarCategorias(cardCode, filaCliente, filaCarga);
+            return;
+        }
+        sincronizarVisibilidadHijos(filaCliente);
+    }
+
+    function alternarCategoria(filaCategoria) {
+        var cardCode = filaCategoria.dataset.cardCode;
+        var categoriaCodigo = filaCategoria.dataset.categoriaCodigo;
+        var clave = cardCode + '|' + categoriaCodigo;
+        var abierta = filaCategoria.classList.toggle('expandida');
+
+        if (abierta && !cacheProductos[clave]) {
+            var filaCarga = crearFilaCargando();
+            filaCategoria.after(filaCarga);
+            cargarProductos(cardCode, categoriaCodigo, filaCategoria.dataset.categoriaNombre, filaCategoria, filaCarga);
+            return;
+        }
+        sincronizarVisibilidadHijos(filaCategoria);
+    }
+
+    // Muestra/oculta los hijos DIRECTOS de una fila según si esta quedó expandida — los nietos (si los
+    // hay) conservan su propio estado de expandida/colapsada de antes, esta función solo decide si se
+    // VEN o no según la cadena de ancestros. Se llama también después de insertar filas nuevas.
+    function sincronizarVisibilidadHijos(filaPadre) {
+        var nivelPadre = nivelDe(filaPadre);
+        var visiblePadre = filaPadre.style.display !== 'none';
+        var mostrar = visiblePadre && filaPadre.classList.contains('expandida');
+        var fila = filaPadre.nextElementSibling;
+        while (fila && nivelDe(fila) > nivelPadre) {
+            var esHijoDirecto = nivelDe(fila) === nivelPadre + 1;
+            if (esHijoDirecto) {
+                fila.style.display = mostrar ? '' : 'none';
+                // Si el hijo directo tiene sus propios hijos y él mismo está expandido, hay que
+                // sincronizarlos también (recursivo) — si el padre se está colapsando, sus hijos ya
+                // quedan ocultos por el bucle igual, sin necesidad de tocar la clase 'expandida' de nadie.
+                sincronizarVisibilidadHijos(fila);
+            } else if (!mostrar) {
+                fila.style.display = 'none';
+            }
+            fila = fila.nextElementSibling;
+        }
+    }
+
+    function nivelDe(fila) {
+        if (fila.classList.contains('fila-cliente')) return 0;
+        if (fila.classList.contains('fila-categoria')) return 1;
+        if (fila.classList.contains('fila-producto')) return 2;
+        return 99; // filas de carga/vacío — cuentan como "más profundas que cualquier hermano real"
+    }
+
+    function crearFilaCargando() {
+        var tr = document.createElement('tr');
+        tr.className = 'fila-estado';
+        var td = document.createElement('td');
+        td.colSpan = colspanFila();
+        td.className = 'fila-estado-texto';
+        td.textContent = 'Cargando…';
+        tr.appendChild(td);
+        return tr;
+    }
+
+    function crearFilaMensaje(mensaje) {
+        var tr = document.createElement('tr');
+        tr.className = 'fila-estado';
+        var td = document.createElement('td');
+        td.colSpan = colspanFila();
+        td.className = 'fila-estado-texto';
+        td.textContent = mensaje;
+        tr.appendChild(td);
+        return tr;
+    }
+
+    // --- Carga de datos (AJAX perezoso, mismo patrón de siempre) ---
+
+    function cargarCategorias(cardCode, filaCliente, filaCarga) {
+        var params = new URLSearchParams(window.location.search);
+        params.set('handler', 'Productos');
+        params.set('cardCode', cardCode);
+
+        fetch(window.location.pathname + '?' + params.toString())
+            .then(function (respuesta) {
+                if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
+                return respuesta.json();
+            })
+            .then(function (datos) {
+                cacheCategorias[cardCode] = datos;
+                var filas = datos.categorias.length === 0
+                    ? [crearFilaMensaje('Sin categorías con ventas para este cliente en el período filtrado.')]
+                    : datos.categorias.map(function (c) {
+                        return crearFilaNivel(1, {
+                            nombre: c.nombre,
+                            montoPorMes: c.montoPorMes,
+                            totalGeneral: c.totalGeneral,
+                            promedioMes: c.promedioMes,
+                            peso: c.pesoCategoria,
+                            porcentajeCartera: c.porcentajeCartera,
+                            porcentajeMargen: c.porcentajeMargen,
+                        }, datos.meses, {
+                            expandible: true,
+                            etiquetaNivel: 'Categoría',
+                            cardCode: cardCode,
+                            categoriaCodigo: c.codigo,
+                            categoriaNombre: c.nombre,
+                        });
+                    });
+                filaCarga.replaceWith.apply(filaCarga, filas);
+                // Por si el usuario colapsó el cliente mientras el fetch todavía estaba en camino —
+                // las filas recién insertadas nacen visibles por defecto, esto las oculta si ya no
+                // corresponde mostrarlas.
+                sincronizarVisibilidadHijos(filaCliente);
+            })
+            .catch(function () {
+                filaCarga.replaceWith(crearFilaMensaje('No se pudo cargar el detalle de categorías.'));
+            });
+    }
+
+    function cargarProductos(cardCode, categoriaCodigo, categoriaNombre, filaCategoria, filaCarga) {
+        var clave = cardCode + '|' + categoriaCodigo;
+        var params = new URLSearchParams(window.location.search);
+        params.set('handler', 'ProductosPorCategoria');
+        params.set('cardCode', cardCode);
+        params.set('categoriaCodigo', categoriaCodigo);
+
+        fetch(window.location.pathname + '?' + params.toString())
+            .then(function (respuesta) {
+                if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
+                return respuesta.json();
+            })
+            .then(function (datos) {
+                cacheProductos[clave] = datos;
+                var filas = datos.productos.length === 0
+                    ? [crearFilaMensaje('Sin líneas de detalle para esta categoría.')]
+                    : datos.productos.map(function (p) {
+                        return crearFilaNivel(2, {
+                            nombre: p.nombre,
+                            montoPorMes: p.montoPorMes,
+                            totalGeneral: p.totalGeneral,
+                            promedioMes: p.promedioMes,
+                            peso: p.pesoProducto,
+                            porcentajeCartera: p.porcentajeCartera,
+                            porcentajeMargen: p.porcentajeMargen,
+                        }, datos.meses, { expandible: false, etiquetaNivel: 'Producto' });
+                    });
+                filaCarga.replaceWith.apply(filaCarga, filas);
+                sincronizarVisibilidadHijos(filaCategoria);
+            })
+            .catch(function () {
+                filaCarga.replaceWith(crearFilaMensaje('No se pudo cargar el detalle de productos.'));
+            });
+    }
+
+    // --- Construcción de una fila de nivel 1 (categoría) o 2 (producto) — mismas columnas/clases que
+    //     la fila de cliente (nivel 0), para que todo alinee y el tinte de "mes actual" siga bajando por
+    //     las columnas. Las 4 columnas de Facturas/Guías/Total/%año ant. no existen a este nivel de
+    //     detalle (no se trackea guías pendientes por categoría/producto) — se muestran en blanco ("—")
+    //     en vez de mostrar un número que se confundiría con "Total = Facturas + Guías" de la fila cliente. ---
+    function crearFilaNivel(nivel, item, meses, opciones) {
+        var tr = document.createElement('tr');
+        tr.className = nivel === 1 ? 'fila-categoria' : 'fila-producto';
+        if (opciones.expandible) {
+            tr.dataset.cardCode = opciones.cardCode;
+            tr.dataset.categoriaCodigo = opciones.categoriaCodigo;
+            tr.dataset.categoriaNombre = opciones.categoriaNombre;
+        }
+
+        var tdN = document.createElement('td');
+        tdN.className = 'col-sticky col-sticky-1';
+        tr.appendChild(tdN);
+
+        var tdNombre = document.createElement('td');
+        tdNombre.className = 'col-sticky col-sticky-2';
+        var envoltorio = document.createElement('div');
+        envoltorio.className = 'nombre-cliente nombre-nivel' + nivel;
+        var chevron = document.createElement('span');
+        chevron.className = 'chevron' + (opciones.expandible ? '' : ' chevron-hoja');
+        chevron.textContent = '▶';
+        var texto = document.createElement('span');
+        texto.className = 'nombre-cliente-texto';
+        texto.textContent = item.nombre;
+        var banda = document.createElement('span');
+        banda.className = 'banda-nivel';
+        banda.textContent = opciones.etiquetaNivel;
+        envoltorio.appendChild(chevron);
+        envoltorio.appendChild(texto);
+        envoltorio.appendChild(banda);
+        tdNombre.appendChild(envoltorio);
+        tr.appendChild(tdNombre);
+
+        // Meses "planos" — todos, salvo que el desglose del mes actual esté activo, en cuyo caso el
+        // último mes de la lista se muestra aparte (las 4 columnas en blanco de más abajo).
+        var mesesPlanos = desgloseActivo ? meses.slice(0, -1) : meses;
+        mesesPlanos.forEach(function (etiquetaMes) {
+            var monto = (item.montoPorMes && item.montoPorMes[etiquetaMes]) || 0;
+            var td = document.createElement('td');
+            td.textContent = monto === 0 ? '—' : formateador.format(monto);
+            tr.appendChild(td);
+        });
+
+        if (desgloseActivo) {
+            [
+                'col-mes-actual col-mes-actual-inicio',
+                'col-mes-actual',
+                'col-mes-actual col-mes-actual-total',
+                'col-mes-actual col-mes-actual-fin',
+            ].forEach(function (clase) {
+                var td = document.createElement('td');
+                td.className = clase;
+                td.textContent = '—';
+                tr.appendChild(td);
+            });
+        }
+
+        [
+            ['col-total', formateador.format(item.totalGeneral)],
+            ['col-calc', formateador.format(item.promedioMes)],
+            ['col-calc', Math.round(item.peso) + '%'],
+            ['col-calc', Math.round(item.porcentajeCartera) + '%'],
+            ['col-mg', Math.round(item.porcentajeMargen) + '%'],
+        ].forEach(function (par) {
+            var td = document.createElement('td');
+            td.className = par[0];
+            td.textContent = par[1];
+            tr.appendChild(td);
+        });
+
+        return tr;
+    }
 
     // --- Buscador (por nombre de cliente) ---
     var buscador = document.getElementById('buscador-cartera');
@@ -30,27 +285,39 @@ document.addEventListener('DOMContentLoaded', function () {
             var termino = normalizarTexto(buscador.value);
             var visibles = 0;
             var total = 0;
-            tabla.querySelectorAll('tbody > tr.fila-cliente').forEach(function (fila) {
+            tabla.querySelectorAll('tbody > tr.fila-cliente').forEach(function (filaCliente) {
                 total++;
-                var nombre = normalizarTexto(fila.querySelector('.nombre-cliente-texto').textContent);
+                var nombre = normalizarTexto(filaCliente.querySelector('.nombre-cliente-texto').textContent);
                 var coincide = termino === '' || nombre.indexOf(termino) !== -1;
-                fila.style.display = coincide ? '' : 'none';
+                var bloque = obtenerBloqueCliente(filaCliente);
                 if (coincide) {
                     visibles++;
+                    filaCliente.style.display = '';
+                    sincronizarVisibilidadHijos(filaCliente);
                 } else {
                     // Si estaba expandida y deja de coincidir con la búsqueda, se cierra — si no, queda
                     // un detalle abierto "flotando" sin su fila visible.
-                    fila.classList.remove('expandida');
-                    fila.nextElementSibling.classList.remove('abierta');
+                    filaCliente.classList.remove('expandida');
+                    bloque.forEach(function (fila) { fila.style.display = 'none'; });
                 }
             });
             contador.textContent = termino === '' ? '' : (visibles + ' de ' + total + ' cliente(s)');
         });
     }
 
+    // Todas las filas de un cliente (la suya + todo lo insertado debajo, cualquier nivel) — por
+    // construcción son exactamente los <tr> siguientes hasta el próximo '.fila-cliente'.
+    function obtenerBloqueCliente(filaCliente) {
+        var bloque = [filaCliente];
+        var fila = filaCliente.nextElementSibling;
+        while (fila && !fila.classList.contains('fila-cliente')) {
+            bloque.push(fila);
+            fila = fila.nextElementSibling;
+        }
+        return bloque;
+    }
+
     // --- Encabezados ordenables (clic = ordena por esa columna; clic de nuevo = invierte el sentido) ---
-    var thead = tabla.querySelector('thead');
-    var tbody = tabla.querySelector('tbody');
     var estadoOrden = { indice: -1, direccion: 'desc' };
 
     thead.querySelectorAll('th.th-ordenable').forEach(function (th) {
@@ -74,30 +341,31 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // Ordenar reordena los BLOQUES de cliente (fila + todo lo insertado debajo) como unidad — nunca
+    // reordena categorías/productos entre sí, esta tabla solo ordena por cliente.
     function ordenarTabla(indiceColumna, tipo, direccion) {
         var factor = direccion === 'asc' ? 1 : -1;
-        var pares = [];
-        tbody.querySelectorAll('tr.fila-cliente').forEach(function (fila) {
-            pares.push({ fila: fila, detalle: fila.nextElementSibling });
+        var bloques = [];
+        tabla.querySelectorAll('tbody > tr.fila-cliente').forEach(function (filaCliente) {
+            bloques.push({ filaCliente: filaCliente, filas: obtenerBloqueCliente(filaCliente) });
         });
 
-        pares.sort(function (a, b) {
-            var va = valorDeCelda(a.fila.cells[indiceColumna], tipo);
-            var vb = valorDeCelda(b.fila.cells[indiceColumna], tipo);
+        bloques.sort(function (a, b) {
+            var va = valorDeCelda(a.filaCliente.cells[indiceColumna], tipo);
+            var vb = valorDeCelda(b.filaCliente.cells[indiceColumna], tipo);
             var comparacion = tipo === 'numero' ? (va - vb) : va.localeCompare(vb, 'es');
             return comparacion * factor;
         });
 
-        pares.forEach(function (par) {
-            tbody.appendChild(par.fila);
-            tbody.appendChild(par.detalle);
+        bloques.forEach(function (bloque) {
+            bloque.filas.forEach(function (fila) { tbody.appendChild(fila); });
         });
 
         // El N° es la posición visual actual, no un id — se renumera después de cada orden nuevo.
         var n = 0;
-        tbody.querySelectorAll('tr.fila-cliente').forEach(function (fila) {
+        tbody.querySelectorAll('tr.fila-cliente').forEach(function (filaCliente) {
             n++;
-            fila.cells[0].textContent = n;
+            filaCliente.cells[0].textContent = n;
         });
     }
 
@@ -114,262 +382,5 @@ document.addEventListener('DOMContentLoaded', function () {
         // NFD separa cada letra acentuada en (letra base + marca diacrítica); U+0300-U+036F es el
         // rango Unicode de esas marcas — sacándolas, "Núñez" y "Nunez" matchean igual en el buscador.
         return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-    }
-
-    function cargarCategorias(cardCode, filaCliente, filaDetalle) {
-        var celda = filaDetalle.querySelector('td');
-        celda.replaceChildren(nota('Cargando…'));
-
-        var params = new URLSearchParams(window.location.search);
-        params.set('handler', 'Productos');
-        params.set('cardCode', cardCode);
-
-        fetch(window.location.pathname + '?' + params.toString())
-            .then(function (respuesta) {
-                if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
-                return respuesta.json();
-            })
-            .then(function (datos) {
-                cacheCategorias[cardCode] = datos;
-                var nombreCliente = filaCliente.querySelector('.nombre-cliente-texto').textContent;
-                celda.replaceChildren(renderDetalleCategorias(cardCode, nombreCliente, datos));
-            })
-            .catch(function () {
-                celda.replaceChildren(nota('No se pudo cargar el detalle de categorías.'));
-            });
-    }
-
-    function cargarProductos(cardCode, categoriaCodigo, categoriaNombre, celdaDetalleCategoria) {
-        var clave = cardCode + '|' + categoriaCodigo;
-        celdaDetalleCategoria.replaceChildren(nota('Cargando…'));
-
-        var params = new URLSearchParams(window.location.search);
-        params.set('handler', 'ProductosPorCategoria');
-        params.set('cardCode', cardCode);
-        params.set('categoriaCodigo', categoriaCodigo);
-
-        fetch(window.location.pathname + '?' + params.toString())
-            .then(function (respuesta) {
-                if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
-                return respuesta.json();
-            })
-            .then(function (datos) {
-                cacheProductos[clave] = datos;
-                celdaDetalleCategoria.replaceChildren(renderDetalleProductos(categoriaNombre, datos));
-            })
-            .catch(function () {
-                celdaDetalleCategoria.replaceChildren(nota('No se pudo cargar el detalle de productos.'));
-            });
-    }
-
-    // Con tablas anidadas dos niveles (cliente → categoría → producto), el truco CSS de "width:0 en
-    // la celda del detalle" para evitar que la tabla externa se estire ya no alcanza — el contenido de
-    // la mini-tabla (otra tabla adentro) tiene un ancho mínimo que igual la infla. Como refuerzo, se le
-    // pone a cada mini-tabla un ancho máximo en píxeles medido contra un contenedor que sí es estable
-    // (el ancho real de la página, no afectado por este problema), así el scroll propio de la mini-tabla
-    // pasa a ser real en vez de heredar el scroll de toda la tabla de Cartera.
-    function limitarAnchoContenedor(contenedor) {
-        var referencia = document.querySelector('.insuseg-container');
-        if (referencia) {
-            contenedor.style.maxWidth = referencia.clientWidth + 'px';
-        }
-    }
-
-    // --- Nivel 1: categorías ---
-
-    function renderDetalleCategorias(cardCode, nombreCliente, datos) {
-        var wrap = document.createElement('div');
-        wrap.className = 'detalle-wrap';
-        wrap.appendChild(encabezadoDetalle('Detalle por categoría — ' + nombreCliente));
-        wrap.appendChild(nota(
-            'Peso Categoría', ' = monto de la categoría ÷ total de este cliente. ',
-            '% Cartera', ' = participación de este cliente dentro del total vendido de esa categoría a todos los clientes.'));
-
-        var contenedorScroll = document.createElement('div');
-        contenedorScroll.className = 'tabla-scroll tabla-vertical-limitada tabla-detalle-mini';
-        limitarAnchoContenedor(contenedorScroll);
-        var tabla = document.createElement('table');
-        tabla.className = 'insuseg-table-mini';
-        tabla.appendChild(construirEncabezado('Categoría', 'Peso Categoría', datos.meses));
-
-        var tbody = document.createElement('tbody');
-        if (datos.categorias.length === 0) {
-            tbody.appendChild(filaVacia(datos.meses.length));
-        } else {
-            datos.categorias.forEach(function (c) {
-                var celdas = [
-                    c.nombre,
-                    c.totalGeneral,
-                    c.promedioMes,
-                    Math.round(c.pesoCategoria) + '%',
-                    Math.round(c.porcentajeCartera) + '%',
-                    Math.round(c.porcentajeMargen) + '%',
-                ];
-                var filaDetalleCategoria = document.createElement('tr');
-                filaDetalleCategoria.className = 'fila-detalle';
-                var tdDetalleCategoria = document.createElement('td');
-                tdDetalleCategoria.colSpan = datos.meses.length + 6;
-                filaDetalleCategoria.appendChild(tdDetalleCategoria);
-
-                var filaCategoria = construirFilaExpandible(c.nombre, c.montoPorMes, celdas, datos.meses, function (abierta) {
-                    filaDetalleCategoria.classList.toggle('abierta', abierta);
-                    if (abierta && !cacheProductos[cardCode + '|' + c.codigo]) {
-                        cargarProductos(cardCode, c.codigo, c.nombre, tdDetalleCategoria);
-                    }
-                });
-
-                tbody.appendChild(filaCategoria);
-                tbody.appendChild(filaDetalleCategoria);
-            });
-        }
-        tabla.appendChild(tbody);
-        contenedorScroll.appendChild(tabla);
-        wrap.appendChild(contenedorScroll);
-
-        if (window.InsusegTablas) {
-            window.InsusegTablas.aplicarBotonExpandir(contenedorScroll);
-        }
-        return wrap;
-    }
-
-    // --- Nivel 2: productos de una categoría ---
-
-    function renderDetalleProductos(categoria, datos) {
-        var wrap = document.createElement('div');
-        wrap.className = 'detalle-wrap';
-        wrap.appendChild(encabezadoDetalle('Detalle por producto — ' + categoria));
-        wrap.appendChild(nota(
-            'Peso Producto', ' = monto del producto ÷ total de esta categoría (para este cliente). ',
-            '% Cartera', ' = participación de este cliente dentro del total vendido de ese producto a todos los clientes.'));
-
-        var contenedorScroll = document.createElement('div');
-        contenedorScroll.className = 'tabla-scroll tabla-vertical-limitada tabla-detalle-mini';
-        limitarAnchoContenedor(contenedorScroll);
-        var tabla = document.createElement('table');
-        tabla.className = 'insuseg-table-mini';
-        tabla.appendChild(construirEncabezado('Producto', 'Peso Producto', datos.meses));
-
-        var tbody = document.createElement('tbody');
-        if (datos.productos.length === 0) {
-            tbody.appendChild(filaVacia(datos.meses.length));
-        } else {
-            datos.productos.forEach(function (p) {
-                var celdas = [
-                    p.nombre,
-                    p.totalGeneral,
-                    p.promedioMes,
-                    Math.round(p.pesoProducto) + '%',
-                    Math.round(p.porcentajeCartera) + '%',
-                    Math.round(p.porcentajeMargen) + '%',
-                ];
-                tbody.appendChild(construirFilaSimple(p.montoPorMes, celdas, datos.meses));
-            });
-        }
-        tabla.appendChild(tbody);
-        contenedorScroll.appendChild(tabla);
-        wrap.appendChild(contenedorScroll);
-
-        if (window.InsusegTablas) {
-            window.InsusegTablas.aplicarBotonExpandir(contenedorScroll);
-        }
-        return wrap;
-    }
-
-    // --- Helpers de construcción de DOM, compartidos por ambos niveles ---
-
-    function encabezadoDetalle(texto) {
-        var header = document.createElement('div');
-        header.className = 'detalle-header';
-        var h3 = document.createElement('h3');
-        h3.textContent = texto;
-        header.appendChild(h3);
-        return header;
-    }
-
-    // Acepta pares (texto en negrita, texto normal) además de un mensaje simple de una sola cadena.
-    function nota() {
-        var p = document.createElement('p');
-        p.className = 'detalle-nota';
-        if (arguments.length === 1) {
-            p.textContent = arguments[0];
-            return p;
-        }
-        for (var i = 0; i < arguments.length; i += 2) {
-            var strong = document.createElement('strong');
-            strong.textContent = arguments[i];
-            p.appendChild(strong);
-            p.appendChild(document.createTextNode(arguments[i + 1]));
-        }
-        return p;
-    }
-
-    function construirEncabezado(colPrimera, colPeso, meses) {
-        var thead = document.createElement('thead');
-        var tr = document.createElement('tr');
-        tr.appendChild(crearCelda('th', colPrimera, 'col-sticky col-sticky-solo'));
-        meses.forEach(function (m) { tr.appendChild(crearCelda('th', m)); });
-        ['Total general', 'Promedio Mes', colPeso, '% Cartera', '% MG'].forEach(function (texto) {
-            tr.appendChild(crearCelda('th', texto));
-        });
-        thead.appendChild(tr);
-        return thead;
-    }
-
-    // Fila de datos sin comportamiento de clic (hoja del árbol — un producto).
-    function construirFilaSimple(montoPorMes, celdas, meses) {
-        var tr = document.createElement('tr');
-        tr.appendChild(crearCelda('td', celdas[0], 'col-sticky col-sticky-solo'));
-        meses.forEach(function (m) {
-            var monto = montoPorMes[m] || 0;
-            tr.appendChild(crearCelda('td', monto === 0 ? '—' : formateador.format(monto)));
-        });
-        for (var i = 1; i < celdas.length; i++) {
-            var valor = typeof celdas[i] === 'number' ? formateador.format(celdas[i]) : celdas[i];
-            tr.appendChild(crearCelda('td', valor));
-        }
-        return tr;
-    }
-
-    // Fila de datos CON comportamiento de clic (nodo intermedio — una categoría, expande a productos).
-    // Mismo look que .fila-cliente (chevron + nombre), reutilizando esas clases.
-    function construirFilaExpandible(nombre, montoPorMes, celdas, meses, alCambiarAbierta) {
-        var tr = construirFilaSimple(montoPorMes, celdas, meses);
-        tr.classList.add('fila-categoria');
-
-        var primeraCelda = tr.querySelector('td');
-        var envoltorio = document.createElement('div');
-        envoltorio.className = 'nombre-cliente';
-        var chevron = document.createElement('span');
-        chevron.className = 'chevron';
-        chevron.textContent = '▶';
-        var texto = document.createElement('span');
-        texto.className = 'nombre-cliente-texto';
-        texto.textContent = nombre;
-        envoltorio.appendChild(chevron);
-        envoltorio.appendChild(texto);
-        primeraCelda.replaceChildren(envoltorio);
-
-        tr.addEventListener('click', function () {
-            var abierta = tr.classList.toggle('expandida');
-            alCambiarAbierta(abierta);
-        });
-
-        return tr;
-    }
-
-    function filaVacia(cantidadMeses) {
-        var tr = document.createElement('tr');
-        var td = document.createElement('td');
-        td.colSpan = cantidadMeses + 6;
-        td.textContent = 'Sin líneas de detalle para este cliente.';
-        tr.appendChild(td);
-        return tr;
-    }
-
-    function crearCelda(tagName, contenido, claseCss) {
-        var el = document.createElement(tagName);
-        if (claseCss) el.className = claseCss;
-        el.textContent = contenido;
-        return el;
     }
 });
