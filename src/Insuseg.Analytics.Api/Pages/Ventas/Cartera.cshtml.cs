@@ -401,7 +401,6 @@ public class CarteraModel : PageModel
         AplicarPeriodoPorDefecto();
         await AplicarRestriccionVendedorAsync();
         var meses = GenerarMeses(Desde!.Value, Hasta!.Value);
-        var categoriaCodigoPorItem = await _db.Items.ToDictionaryAsync(i => i.ItemCode, i => i.CategoryCode, ct);
         var nombrePorCategoriaCodigo = await _db.ItemCategories.ToDictionaryAsync(c => c.Code, c => c.Name, ct);
         string NombreDeCategoria(string codigo) =>
             codigo == SinCategoriaCodigo ? SinCategoriaNombre : nombrePorCategoriaCodigo.GetValueOrDefault(codigo, SinCategoriaNombre);
@@ -409,23 +408,31 @@ public class CarteraModel : PageModel
         // Total vendido de cada categoría a TODOS los clientes en el período — siempre sin el filtro de
         // vendedor, mismo criterio que el resto de los "% Cartera" de esta página: la base de
         // comparación es una propiedad de la categoría, no del filtro que esté activo.
-        var lineasPeriodoGlobal = await _db.SaleLines
-            .Join(_db.Sales,
-                l => new { l.DocEntry, l.SourceDocType },
-                s => new { s.DocEntry, s.SourceDocType },
-                (l, s) => new { s.SaleDate, l.ItemCode, l.LineTotal })
-            .Where(x => x.SaleDate >= Desde && x.SaleDate <= Hasta)
-            .ToListAsync(ct);
-        var totalPorCategoriaGlobal = lineasPeriodoGlobal
-            .GroupBy(x => categoriaCodigoPorItem.GetValueOrDefault(x.ItemCode) ?? SinCategoriaCodigo)
-            .ToDictionary(g => g.Key, g => g.Sum(x => x.LineTotal));
+        // Antes esto traía TODAS las líneas del período (de TODOS los clientes, no solo el que se pidió)
+        // a memoria de la app para agrupar ahí — medido en 13s por clic el 2026-08-21, con ~100k+ líneas
+        // en el período completo. El agregado ahora se hace en SQL Server, uniendo contra Items por
+        // CategoryCode (columna real de la tabla — no hacía falta traer nada a memoria para esto).
+        var totalPorCategoriaGlobal = await (
+                from l in _db.SaleLines
+                join s in _db.Sales on new { l.DocEntry, l.SourceDocType } equals new { s.DocEntry, s.SourceDocType }
+                where s.SaleDate >= Desde && s.SaleDate <= Hasta
+                join i in _db.Items on l.ItemCode equals i.ItemCode into itemsJoin
+                from i in itemsJoin.DefaultIfEmpty()
+                select new { CategoryCode = i.CategoryCode ?? SinCategoriaCodigo, l.LineTotal })
+            .GroupBy(x => x.CategoryCode)
+            .Select(g => new { Codigo = g.Key, Total = g.Sum(x => x.LineTotal) })
+            .ToDictionaryAsync(x => x.Codigo, x => x.Total, ct);
 
-        var lineasClienteQuery = _db.SaleLines
-            .Join(_db.Sales,
-                l => new { l.DocEntry, l.SourceDocType },
-                s => new { s.DocEntry, s.SourceDocType },
-                (l, s) => new { s.CardCode, s.SaleDate, s.SalesPersonCode, l.ItemCode, l.Quantity, l.LineTotal, l.GrossBuyPrice })
-            .Where(x => x.SaleDate >= Desde && x.SaleDate <= Hasta && x.CardCode == cardCode);
+        // CategoryCode se trae acá con el mismo join a Items que totalPorCategoriaGlobal (en vez de un
+        // diccionario aparte con la tabla Items completa, ~25k filas) — este cliente puntual solo compró
+        // un puñado de productos distintos, no tiene sentido traer el catálogo entero para resolverlos.
+        var lineasClienteQuery =
+            from l in _db.SaleLines
+            join s in _db.Sales on new { l.DocEntry, l.SourceDocType } equals new { s.DocEntry, s.SourceDocType }
+            where s.SaleDate >= Desde && s.SaleDate <= Hasta && s.CardCode == cardCode
+            join i in _db.Items on l.ItemCode equals i.ItemCode into itemsJoin
+            from i in itemsJoin.DefaultIfEmpty()
+            select new { s.SaleDate, s.SalesPersonCode, l.Quantity, l.LineTotal, l.GrossBuyPrice, CategoryCode = i.CategoryCode ?? SinCategoriaCodigo };
 
         if (VendedorCodigo.HasValue)
         {
@@ -433,13 +440,13 @@ public class CarteraModel : PageModel
         }
 
         var lineasCliente = await lineasClienteQuery
-            .Select(x => new { x.SaleDate, x.ItemCode, x.Quantity, x.LineTotal, x.GrossBuyPrice })
+            .Select(x => new { x.SaleDate, x.CategoryCode, x.Quantity, x.LineTotal, x.GrossBuyPrice })
             .ToListAsync(ct);
 
         var totalCliente = lineasCliente.Sum(x => x.LineTotal);
 
         var categorias = lineasCliente
-            .GroupBy(x => categoriaCodigoPorItem.GetValueOrDefault(x.ItemCode) ?? SinCategoriaCodigo)
+            .GroupBy(x => x.CategoryCode)
             .Select(g =>
             {
                 var montoPorMes = meses.ToDictionary(
