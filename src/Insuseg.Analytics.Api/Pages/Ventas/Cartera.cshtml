@@ -191,13 +191,12 @@
             var maxMargenMensual = Model.MargenMensual.Max(m => m.Monto);
             var mesDestacado = Model.MargenMensual.OrderByDescending(m => m.Monto).First().Etiqueta;
             <p class="detalle-nota">
-                Margen neto (venta − costo) por mes del período filtrado. La altura de la barra es el monto;
-                el <strong>%</strong> arriba es margen ÷ venta neta de ese mes.
-                El punto sobre cada columna compara el margen del mes con el mismo mes del año anterior:
-                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-superado">●</span> verde</span> = superó,
-                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-no-alcanzado">◆</span> naranja</span> = no alcanzó,
-                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-sin-datos">○</span> gris</span> = sin datos para comparar.
-                El mes actual se destaca en tamaño y color pleno.
+                Barra = monto del margen. <strong>%</strong> = margen ÷ venta neta del mes.
+            </p>
+            <p class="detalle-nota">
+                <span class="leyenda-punto"><span class="leyenda-glifo">●</span> superó año anterior</span> ·
+                <span class="leyenda-punto"><span class="leyenda-glifo">◆</span> no alcanzó</span> ·
+                <span class="leyenda-punto"><span class="leyenda-glifo">○</span> sin datos</span>
             </p>
             <div class="margen-chart-scroll">
                 <div class="margen-chart">

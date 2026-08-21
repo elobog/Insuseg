@@ -451,18 +451,6 @@ table.insuseg-table tr:nth-child(even) {
     color: var(--insuseg-orange);
 }
 
-.leyenda-glifo-superado {
-    color: #2f7a3d;
-}
-
-.leyenda-glifo-no-alcanzado {
-    color: var(--insuseg-orange-dark);
-}
-
-.leyenda-glifo-sin-datos {
-    color: #696969;
-}
-
 .tabla-scroll {
     overflow-x: auto;
 }
@@ -543,8 +531,8 @@ table.insuseg-table th.col-mes-actual .th-total {
    el primer intento coloreaba solo el texto con var(--insuseg-orange-dark), el mismo color exacto que
    ya usa el borde de esta columna y el tinte del grupo entero, así que el estado "malo" se camuflaba
    en la decoración en vez de leerse como alerta (ver Insuseg.md, 2026-08-12). Por eso "malo" usa acá
-   un rojo que no es el naranja de marca — a propósito distinto de kpi-bad/leyenda-glifo-no-alcanzado,
-   que sí pueden compartir el naranja porque no están sentados sobre un fondo ya teñido de naranja.
+   un rojo que no es el naranja de marca — a propósito distinto de otras marcas de estado de esta
+   página, que sí pueden compartir el naranja porque no están sentadas sobre un fondo ya teñido de naranja.
    Filas sin dato de comparación ("—") no llevan pastilla, quedan con el texto normal de la tabla. */
 .chip-ritmo {
     display: inline-block;
@@ -940,8 +928,9 @@ th.th-ordenable.orden-desc::after {
     height: 100%;
 }
 
-/* Marca de estado sobre cada columna — mismo criterio de color+forma que .viz-marca en Tendencia,
-   adaptado a HTML/CSS en vez de SVG (círculo lleno / rombo / anillo hueco). */
+/* Marca de estado sobre cada columna — mismo criterio que .viz-marca en Tendencia, adaptado a
+   HTML/CSS en vez de SVG: el estado depende SOLO de la forma (círculo lleno / rombo / anillo hueco),
+   nunca del color — las tres en el mismo naranja de marca (pedido del usuario, 2026-08-21). */
 .margen-marca {
     width: 9px;
     height: 9px;
@@ -951,18 +940,18 @@ th.th-ordenable.orden-desc::after {
 }
 
 .margen-marca-superado {
-    background: #2f7a3d;
+    background: var(--insuseg-orange);
     border-radius: 50%;
 }
 
 .margen-marca-no-alcanzado {
-    background: var(--insuseg-orange-dark);
+    background: var(--insuseg-orange);
     transform: rotate(45deg);
 }
 
 .margen-marca-sin-datos {
     background: transparent;
-    border: 2px solid #696969;
+    border: 2px solid var(--insuseg-orange);
     border-radius: 50%;
 }
 
