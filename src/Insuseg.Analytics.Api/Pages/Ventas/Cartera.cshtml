@@ -136,11 +136,9 @@
         else
         {
             <p class="detalle-nota">
-                Los puntos comparan cada mes con el mismo mes del año anterior:
-                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-superado">●</span> verde</span> = superó,
-                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-no-alcanzado">◆</span> naranja</span> = no alcanzó,
-                <span class="leyenda-punto"><span class="leyenda-glifo leyenda-glifo-sin-datos">○</span> gris</span> = sin datos para comparar
-                (mes fuera del historial cargado). El mes actual se destaca en tamaño y color pleno.
+                <span class="leyenda-punto"><span class="leyenda-glifo">●</span> superó año anterior</span> ·
+                <span class="leyenda-punto"><span class="leyenda-glifo">◆</span> no alcanzó</span> ·
+                <span class="leyenda-punto"><span class="leyenda-glifo">○</span> sin datos</span>
             </p>
             <div class="viz-tendencia" data-puntos='@puntosTendenciaJson'>
                 <svg viewBox="0 0 @F(anchoSvg) @F(altoSvg)" class="viz-svg" role="img" aria-label="Tendencia de ventas netas por mes">

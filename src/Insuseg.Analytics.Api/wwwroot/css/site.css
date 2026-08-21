@@ -448,6 +448,7 @@ table.insuseg-table tr:nth-child(even) {
 
 .leyenda-glifo {
     font-weight: 700;
+    color: var(--insuseg-orange);
 }
 
 .leyenda-glifo-superado {
@@ -848,29 +849,25 @@ th.th-ordenable.orden-desc::after {
 
 /* Marcas de estado por mes (Tendencia y Margen por mes) — comparan cada mes contra el mismo mes
    del año anterior. El color reutiliza el mismo verde/naranja oscuro que ya usan las tarjetas KPI
-   "kpi-good"/"kpi-bad", pero el estado NUNCA depende solo del color: cada estado tiene una forma
-   distinta (círculo lleno / rombo / anillo hueco) — validado con la skill dataviz, el par verde/naranja
-   está en la banda "WARN" de separación ante daltonismo rojo-verde, legal solo con esta codificación
-   secundaria por forma. Los meses pasados salen atenuados (opacity); el mes actual sale a tamaño y
-   opacidad plena para que resalte más — ver clase .marca-actual. */
+   "kpi-good"/"kpi-bad", pero acá el estado depende SOLO de la forma, nunca del color (pedido del
+   usuario, 2026-08-21) — círculo lleno = superó, rombo lleno = no alcanzó, anillo hueco = sin datos,
+   las tres en el mismo naranja de marca (mismo tono que la línea/área del gráfico). Los meses pasados
+   salen atenuados (opacity); el mes actual sale a tamaño y opacidad plena para que resalte más — ver
+   clase .marca-actual. */
 .viz-marca {
     stroke-width: 2;
     transition: opacity 0.15s ease;
 }
 
-.viz-marca-superado {
-    fill: #2f7a3d;
-    stroke: #fff;
-}
-
+.viz-marca-superado,
 .viz-marca-no-alcanzado {
-    fill: var(--insuseg-orange-dark);
+    fill: var(--insuseg-orange);
     stroke: #fff;
 }
 
 .viz-marca-sin-datos {
     fill: none;
-    stroke: #696969;
+    stroke: var(--insuseg-orange);
 }
 
 .viz-marca:not(.marca-actual) {
