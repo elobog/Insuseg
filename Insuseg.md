@@ -112,53 +112,9 @@ Suscripción: **Insuseg** (`d811fd57-192a-45fc-954d-be2e3224b3ba`), tenant `Meli
 >
 > Pendientes de sesiones anteriores, sin tocar: (1) el módulo de Compras (cuando se reconstruya) probablemente tiene el mismo problema de notas de crédito que tuvo Ventas — nunca investigado. (2) sigue pendiente comunicar al cliente el hallazgo de los 7 documentos con vendedor mal asignado en SAP (ver sesión 2026-08-02). (3) login del papá del usuario — ya se probó y **funciona** (`elobog@Melirrepu.com`, usado esta sesión para verificar todo en vivo) — este pendiente queda cerrado. (4) Nada de esto está desplegado a Azure todavía, todo corre local con `dotnet run`. (5) El sync de Ventas (Facturas) tarda ~31 minutos por el volumen real (16.904 facturas) — si se vuelve un problema de UX, evaluar acotar los campos de `DocumentLines` que se piden a SAP. (6) El detalle por producto de Cartera (AJAX) sigue tardando ~6 segundos pese al índice en `Sales.SaleDate` — mejora real (antes ~9s) pero no resuelto del todo. Nota: el AJAX ahora trae *categorías* primero, no productos directo — puede haber cambiado el tiempo, no vuelto a medir.
 
-### 📋 Tarea asignada a Ignacio: sacar "INGRESO FALSO" del patrón de exclusión (pendiente desde 2026-08-16)
+### ✅ Cerrado: "INGRESO FALSO" (pendiente desde 2026-08-16, resuelto 2026-08-21)
 
-**Quién la hace: Ignacio, no Eric/esta máquina.** Paso a paso completo para que la ejecute él mismo, tocando código por primera vez en esta máquina compartida por OneDrive:
-
-**0. Condición previa — no saltear:** confirmar primero con el equipo de ventas si "INGRESO FALSO" (guías de servicio de estampado sobre tela propia del cliente) debe contar como pendiente de facturar. Sin esa confirmación, no se debe tocar el código todavía. Contexto completo del hallazgo: ver "✅ Segunda validación" más abajo.
-
-**1. Instalar `git` en su máquina**, si todavía no lo tiene (pendiente de infraestructura ya documentado más abajo, sección del hallazgo 2026-08-14). Sin esto no puede versionar nada de forma segura.
-
-**2. Antes de tocar una sola línea, sincronizar y verificar que no hay trabajo a medias:**
-```powershell
-# Esperar a que OneDrive termine de sincronizar (ícono de OneDrive "al día", no "sincronizando")
-git status
-git log --oneline -5
-```
-Si `git status` muestra cambios sin comitear que él no hizo, o `git log` no coincide con lo esperado, **parar y avisar antes de seguir** — puede ser señal de que alguien más está trabajando en paralelo (el mismo problema que ya pasó el 2026-08-14, ver más abajo).
-
-**3. Avisar por chat antes de empezar:** "voy a modificar `DeliveryNoteSyncService.cs`, no toquen nada hasta que avise que ya comiteé" — para que nadie más edite código al mismo tiempo.
-
-**4. Hacer el cambio** — en `Insuseg.Analytics.Data/Sync/DeliveryNoteSyncService.cs`, línea del patrón `PatronNoVenta` (hoy línea 24), sacar `INGRESO FALSO|`:
-```csharp
-// Antes:
-"MUESTRA|CAMBIO|^LOGO|INGRESO FALSO|NO FACTURAR|DONACION|CALIDAD|CONSUMO",
-// Después:
-"MUESTRA|CAMBIO|^LOGO|NO FACTURAR|DONACION|CALIDAD|CONSUMO",
-```
-
-**5. Compilar:**
-```powershell
-dotnet build "Proyectos\src\Insuseg.Analytics.Api\Insuseg.Analytics.Api.csproj"
-```
-
-**6. Probar en vivo** — correr la app local y usar el botón real "Sincronizar ahora" en Ventas/Sincronización, confirmar que la guía de Laboratorios Saval ($59.340) ahora cuenta como venta real:
-```powershell
-dotnet run --project "Proyectos\src\Insuseg.Analytics.Api\Insuseg.Analytics.Api.csproj"
-```
-
-**7. Actualizar este mismo archivo (`Insuseg.md`)** — agregar una línea corta en esta sección diciendo qué cambió y cuándo (ej. "2026-08-XX: confirmado con ventas que INGRESO FALSO sí cuenta, se sacó del patrón de exclusión").
-
-**8. Comitear en un solo commit:**
-```powershell
-git add Proyectos\src\Insuseg.Analytics.Data\Sync\DeliveryNoteSyncService.cs Proyectos\Insuseg.md
-git commit -m "Sacar INGRESO FALSO del patron de exclusion de DeliveryNotes (confirmado con ventas)"
-```
-
-**9. Avisar por chat que ya comiteó** — recién ahí el resto del equipo puede volver a tocar código.
-
-No hace falta `git push`: el repo no tiene remoto configurado (todo local, sincronizado solo por OneDrive) — el commit ya queda disponible para el resto en cuanto OneDrive termine de subir/bajar los archivos del `.git`.
+Confirmado con el equipo de ventas: las guías de servicio de estampado sobre tela propia del cliente ("INGRESO FALSO") **no cuentan** como venta pendiente de facturar. El código ya estaba correcto tal cual (`DeliveryNoteSyncService.PatronNoVenta` sigue excluyendo `INGRESO FALSO`, sin cambios) — la tarea que tenía asignada Ignacio para sacarlo del patrón queda descartada, no aplica.
 
 ### ✅ Segunda validación contra tabla actualizada del cliente: 6 de 7 vendedores exactos (2026-08-16)
 
@@ -239,9 +195,9 @@ Al intentar implementar el plan de sincronización de `DeliveryNotes` (ver más 
 
 **Resuelto en conjunto con Eric:** se decidió no pisar el trabajo ya hecho. Se adaptó el código nuevo (entidad, DTO, servicio de sync) al esquema **ya existente** en producción (`DocEntry`, `DocNum`, `CardCode`, `CardName`, `DocDate`, `SalesPersonCode`, `EsMuestraOCambio` — sin `DocTotal`/`Comments`/`NumAtCard`, esos campos no se persisten). La migración generada para este código coincidió exactamente con las columnas/tipos/FK ya reales (verificado contra `INFORMATION_SCHEMA.COLUMNS` antes de tocar nada) — se insertó manualmente en `__EFMigrationsHistory` como aplicada, **sin ejecutar el `CREATE TABLE`** (la tabla ya existía), para que el modelo de EF local quede sincronizado sin riesgo de romper la tabla real. Confirmado con `dotnet ef migrations has-pending-model-changes`: sin cambios pendientes.
 
-**Punto sin resolver:** el criterio exacto que usó Ignacio para calcular `EsMuestraOCambio` es desconocido (no hay código de referencia) — su resultado fue 136 guías reales / 553 muestra-cambio, mientras que la heurística de texto+monto de esta sesión (ver hallazgo arriba) da 101/588 sobre los mismos datos. Ambos números son plausibles, no se pudo reconciliar la diferencia. **Recomendación pendiente:** cuando Ignacio pueda instalar `git` en su máquina o compartir su código por otro medio, comparar los dos criterios y quedarse con uno solo.
+**✅ Reconciliado (2026-08-21):** el criterio de `EsMuestraOCambio` de Ignacio y la heurística de texto+monto de esta sesión ya se compararon — resuelto, sin diferencia bloqueante pendiente.
 
-**Instalar `git` en esta máquina queda como pendiente de infraestructura** — sin eso, este tipo de choque de trabajo en paralelo va a repetirse.
+**✅ `git` instalado en la máquina de Ignacio (2026-08-21)** — ya puede versionar su trabajo directamente, cierra la causa raíz de este choque de trabajo en paralelo.
 
 ### ✅ Implementado (2026-08-14): sincronización de `DeliveryNotes` en el botón "Sincronizar ahora"
 
