@@ -239,20 +239,17 @@
     <div class="insuseg-card">
         <h2 style="margin-top:0">Ventas por cliente</h2>
         <p class="detalle-nota">
-            Todos los montos son netos (sin IVA).
-            <strong>Peso Cliente</strong> = monto del cliente ÷ total de todos los clientes del período filtrado.
-            <strong>% Cartera</strong> = monto del cliente ÷ total de su vendedor asignado (chip junto al nombre) en el período.
+            Montos netos (sin IVA). <strong>Peso Cliente</strong> = ÷ total de todos los clientes.
+            <strong>% Cartera</strong> = ÷ total de su vendedor (chip junto al nombre).
         </p>
         @if (Model.DesgloseMesActualDisponible)
         {
             <p class="detalle-nota">
-                El mes actual (@(Model.MesActual?.Etiqueta ?? "—"), resaltado en la tabla) se desglosa en 4 columnas en vez de mostrar un solo monto:
-                <strong>Facturas</strong> = ventas ya facturadas ese mes.
-                <strong>Guías</strong> = TODAS las guías de despacho pendientes de facturar de ese cliente (no solo las de este mes — el acumulado completo).
-                <strong>Total</strong> = Facturas del mes + Guías pendientes.
-                <strong>% vs @(Model.MesAnioAnteriorEtiqueta ?? "año anterior")</strong> = Total ÷ venta neta de ese mismo cliente en el mismo mes, un año antes.
-                Estas 4 columnas se mueven solas al mes que esté en curso — el resto de los meses sigue mostrando un solo monto, como siempre. Si filtrás
-                el período para que termine en un mes ya cerrado, este desglose se apaga y ese mes se ve como cualquier otro.
+                @(Model.MesActual?.Etiqueta ?? "—") se desglosa en 4 columnas:
+                <strong>Facturas</strong> = facturado ese mes.
+                <strong>Guías</strong> = guías pendientes acumuladas del cliente.
+                <strong>Total</strong> = Facturas + Guías.
+                <strong>% vs @(Model.MesAnioAnteriorEtiqueta ?? "año anterior")</strong> = Total ÷ venta del mismo mes, año anterior.
             </p>
         }
         @if (Model.Clientes.Count == 0)
