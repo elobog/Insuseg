@@ -8,6 +8,11 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// WebRootPath explícito, como respaldo defensivo (2026-08-19/20) — la causa real de que esto diera
+// null en Azure era el paquete .zip del deploy (ver "Cómo desplegar a Azure" en Insuseg.md), pero
+// dejar esto explícito no depende de que quien despliegue se acuerde de armar el zip bien.
+builder.Environment.WebRootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+
 // Add services to the container.
 
 builder.Services.AddControllers();
