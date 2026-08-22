@@ -751,8 +751,19 @@ table.insuseg-table tbody tr.fila-producto {
    hace falta la sombra que la separe visualmente de las filas que scrollean por debajo. */
 .fila-cliente-fija td {
     position: sticky;
-    z-index: 3;
+    /* Alto a propósito (muy por encima de cualquier z-index que ya use el resto de la tabla, ver
+       .col-sticky más arriba) — con todas las celdas de esta fila en el mismo z-index, al scrollear
+       para el lado una celda de monto (que viene después en el HTML) terminaba pintándose ENCIMA de la
+       columna Cliente en vez de al revés, porque a igual z-index gana el orden del documento. Bug real,
+       encontrado con Playwright, 2026-08-22. */
+    z-index: 10;
     box-shadow: 0 2px 4px -2px rgba(0, 0, 0, 0.25);
+}
+
+/* La columna Cliente de la fila fija tiene que ganarle a las demás celdas de SU PROPIA fila (no solo a
+   las de las demás filas) — es sticky en los dos ejes (arriba Y a la izquierda) a la vez. */
+.fila-cliente-fija td.col-sticky {
+    z-index: 11;
 }
 
 /* Encabezados ordenables — clic para ordenar por esa columna, clic de nuevo invierte el sentido.
