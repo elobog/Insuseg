@@ -71,6 +71,30 @@ Suscripción: **Insuseg** (`d811fd57-192a-45fc-954d-be2e3224b3ba`), tenant `Meli
 
 ## 7. Pendientes / próximos pasos
 
+### Sesión 2026-08-21 (Ignacio): git reemplaza a OneDrive, y una tanda grande de mejoras en Cartera
+
+**Quién trabajó esta sesión: Ignacio**, no Eric — para que quede claro en las secciones históricas de más abajo que dicen "el usuario" sin nombre.
+
+**1. Se dejó de depender de OneDrive para sincronizar código.** El repo ya tenía un remoto real de GitHub (`origin` → `github.com/elobog/Insuseg`) que nadie estaba usando — probado de punta a punta (`fetch`/`push` funcionan sin pedir nada). De ahora en más: `git pull` antes de empezar a trabajar, `git push` apenas se comitea. La carpeta se queda donde está (adentro de OneDrive), pero el código ya no depende de que OneDrive la replique bien — es la causa de fondo del choque de trabajo en paralelo del 2026-08-14 (ver más abajo). Detalle completo en la memoria del proyecto (`insuseg-git-over-onedrive`).
+
+**2. Tres pendientes viejos, cerrados:**
+- **"INGRESO FALSO"** (pendiente desde el 2026-08-16): ventas confirmó que esas guías NO cuentan como venta pendiente — el código ya estaba bien tal cual, no hubo que tocar nada. La tarea que tenía asignada Ignacio queda descartada.
+- **Criterio `EsMuestraOCambio` de Ignacio vs. la heurística de texto+monto**: reconciliado.
+- **`git` instalado en la máquina de Ignacio**: hecho (es justo lo que permitió el punto 1).
+
+**3. Corregida una regla de seguridad que estaba mal escrita en la memoria del proyecto (no en este archivo):** decía que había que cuidarse de escribir en `INSUSEG_PRB`, pero es al revés — `INSUSEG` es la producción real (ver sección 3 de este archivo, ya lo decía bien acá). Ya corregido en la memoria.
+
+**4. Rediseño grande de `Ventas → Cartera de clientes`, todo desplegado y verificado en producción:**
+- **Fila de KPIs**: las 5 tarjetas iguales de antes pasaron a ser un "hero" (la venta del mes actual, con la comparación contra el año pasado adentro) más 4 datos de apoyo más chicos alrededor. Bocetado antes en un canvas y elegido por el usuario.
+- **Gráficos "Tendencia" y "Margen por mes"**: el subtítulo se acortó mucho, y la comparación contra el año anterior (superó/no alcanzó/sin datos) dejó de depender del color — ahora se distingue solo por la forma (círculo/rombo/anillo), las tres del mismo naranja de marca.
+- **Texto de "Ventas por cliente"**: acortado, mismo criterio.
+- **La tabla de detalle (categoría → producto) se rehízo entera**: antes cada nivel abría su propia mini-tabla con scroll propio — con dos niveles ya eran tres cajas de scroll anidadas, e incómodo de manejar (reportado por el usuario). Ahora todo es la MISMA tabla, categoría y producto son filas indentadas insertadas debajo de su padre — un solo scroll para todo el árbol.
+- **Bug de rendimiento real, encontrado en el camino**: abrir las categorías de un cliente tardaba **13 segundos** — el servidor traía a memoria las líneas de venta de TODOS los clientes del período solo para un cálculo que se podía hacer en SQL. Arreglado: **13s → ~0,65-1,3s**. Verificado que el resultado no cambió (misma respuesta, byte a byte). El segundo nivel (productos de una categoría) sigue lento (3,5-5s) pero por una causa distinta (muchas idas y vueltas chicas al servidor, no un bug puntual) — **queda pendiente para otra sesión**, no se tocó.
+- **Fila del cliente "fija"**: al scrollear el detalle largo de un cliente, su propia fila (con todos sus montos, no una franja aparte) queda pegada arriba de la pantalla, así no se pierde de vista mientras se lee la categoría/producto de más abajo. Bug encontrado y arreglado en el camino: al scrollear para el lado con la fila fija, el nombre del cliente desaparecía (un problema de superposición de capas/z-index) — ya corregido.
+- Botón nuevo **"Colapsar todo"** al lado del buscador.
+
+**Pendiente real para la próxima sesión:** el rendimiento del segundo nivel (productos por categoría) sigue en 3,5-5 segundos — no es el mismo tipo de bug que el de categorías (ese ya está arreglado), habría que mirarlo aparte si sigue molestando. Los dos archivos de migración duplicados de Ignacio (`20260813232840_AddDeliveryNotes*`, ver hallazgo del 2026-08-14 más abajo) siguen sin tocar, ya excluidos de la compilación.
+
 > **Actualización misma sesión (2026-08-19/20), más tarde todavía: bug real de despliegue — la app se veía "sin estilos" (sin CSS ni logo) en producción.** El cliente reportó que la página de login se veía como HTML puro, sin diseño. Diagnosticado con un endpoint temporal (`/__debug/wwwroot`, ya sacado) que listaba los archivos reales en el servidor: **`env.WebRootPath` daba `null`**, y los archivos de `wwwroot/` aparecían en el disco de Azure con nombres literales como `wwwroot\css\site.css` (con `\` adentro del nombre, no como carpeta real) — Azure interpretaba mal las carpetas anidadas al montar el paquete `.zip` en modo `WEBSITE_RUN_FROM_PACKAGE` (Linux). **Causa raíz encontrada:** los `.zip` armados en Windows (`Compress-Archive` de PowerShell, o `System.IO.Compression.ZipFile.CreateFromDirectory`) marcan sus entradas con atributo de sistema "Windows/FAT" en vez de "Unix" — el montaje de Azure en Linux, al leer ese atributo, no reconstruye bien las carpetas anidadas para esas entradas (los archivos en la raíz del zip sí funcionaban bien, solo los que estaban dentro de subcarpetas se rompían). Se probó primero desactivar `WEBSITE_RUN_FROM_PACKAGE` (que Azure descomprima a disco en vez de montar el zip) — **empeoró las cosas** (quedó la página de bienvenida por defecto de Azure, sin contenido), así que se revirtió a `WEBSITE_RUN_FROM_PACKAGE=1`.
 >
 > **Fix real: armar el `.zip` marcando explícitamente sus entradas como Unix.** Con PowerShell no se pudo lograr (ambas herramientas de Windows probadas fallan igual) — hay que usar Python (`zipfile`, ya viene con la instalación de Python de esta máquina) seteando `ZipInfo.create_system = 3` en cada entrada. Comando completo para el próximo despliegue (ajustar solo las rutas de origen/destino):
