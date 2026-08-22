@@ -28,44 +28,41 @@ document.addEventListener('DOMContentLoaded', function () {
         return totalColumnas;
     }
 
-    // --- Franja "estás viendo a…" — segunda fila del thead, pegajosa justo debajo de la de columnas.
-    //     Solo aparece mientras el cliente sobre cuyo detalle se scrolleó sigue expandido; clic la
-    //     colapsa sin tener que volver a subir hasta su fila (pedido del usuario, 2026-08-21). ---
-    var filaClienteActual = document.createElement('tr');
-    filaClienteActual.className = 'fila-cliente-actual-sticky';
-    filaClienteActual.style.display = 'none';
-    var tdClienteActual = document.createElement('td');
-    var contenidoClienteActual = document.createElement('div');
-    contenidoClienteActual.className = 'cliente-actual-contenido';
-    var chevronClienteActual = document.createElement('span');
-    chevronClienteActual.className = 'chevron';
-    chevronClienteActual.textContent = '▶';
-    var textoClienteActual = document.createElement('span');
-    contenidoClienteActual.appendChild(chevronClienteActual);
-    contenidoClienteActual.appendChild(textoClienteActual);
-    tdClienteActual.appendChild(contenidoClienteActual);
-    filaClienteActual.appendChild(tdClienteActual);
-    thead.appendChild(filaClienteActual);
-
+    // --- Fijar la FILA REAL del cliente (no una franja aparte) justo debajo del encabezado, mientras
+    //     el scroll está dentro del detalle de ese cliente — así se sigue viendo su Total general,
+    //     Peso, % Cartera, etc. mientras se lee la categoría/producto de más abajo (pedido del usuario,
+    //     2026-08-21 — la primera versión de esto era una franja con solo el nombre; el usuario prefirió
+    //     ver la fila entera con sus montos). Clic la colapsa: es la misma fila de siempre, con el mismo
+    //     handler de clic de siempre — no hace falta ningún listener nuevo para eso. ---
     var contenedorScroll = tabla.closest('.tabla-vertical-limitada');
-    var filaClienteActualReferencia = null;
+    var filaFijaActual = null;
 
-    function medirAlturaEncabezado() {
-        var filaEncabezado = thead.querySelector('tr:not(.fila-cliente-actual-sticky)');
-        tdClienteActual.style.top = filaEncabezado.getBoundingClientRect().height + 'px';
-        tdClienteActual.colSpan = colspanFila();
+    function alturaFilaEncabezado() {
+        return thead.querySelector('tr').getBoundingClientRect().height;
     }
 
-    filaClienteActual.addEventListener('click', function () {
-        if (filaClienteActualReferencia) {
-            alternarCliente(filaClienteActualReferencia);
-        }
-    });
+    function fijarFila(fila, altura) {
+        fila.classList.add('fila-cliente-fija');
+        Array.prototype.forEach.call(fila.cells, function (celda) { celda.style.top = altura + 'px'; });
+    }
 
-    function actualizarBarraClienteActual() {
+    function soltarFila(fila) {
+        fila.classList.remove('fila-cliente-fija');
+        Array.prototype.forEach.call(fila.cells, function (celda) { celda.style.top = ''; });
+    }
+
+    function actualizarFilaFija() {
         if (!contenedorScroll) return;
+        // Sin scroll (scrollTop 0) el primer cliente ya "toca" el borde del header en reposo — sin esta
+        // guarda quedaría marcado como fijo apenas se expande, sin haber scrolleado nada todavía.
+        if (contenedorScroll.scrollTop <= 0) {
+            if (filaFijaActual) soltarFila(filaFijaActual);
+            filaFijaActual = null;
+            return;
+        }
         var rectContenedor = contenedorScroll.getBoundingClientRect();
-        var limiteVisible = rectContenedor.top + thead.querySelector('tr:not(.fila-cliente-actual-sticky)').getBoundingClientRect().height;
+        var alturaHeader = alturaFilaEncabezado();
+        var limiteVisible = rectContenedor.top + alturaHeader;
         var clientes = tbody.querySelectorAll('tr.fila-cliente');
         var actual = null;
         for (var i = 0; i < clientes.length; i++) {
@@ -77,17 +74,15 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        if (actual && actual.classList.contains('expandida')) {
-            filaClienteActualReferencia = actual;
-            textoClienteActual.replaceChildren(
-                document.createTextNode('Viendo a '),
-                (function () { var b = document.createElement('b'); b.textContent = actual.querySelector('.nombre-cliente-texto').textContent; return b; })(),
-                document.createTextNode(' — clic para colapsar'));
-            filaClienteActual.style.display = 'table-row';
-        } else {
-            filaClienteActualReferencia = null;
-            filaClienteActual.style.display = 'none';
+        var nuevaFilaFija = (actual && actual.classList.contains('expandida')) ? actual : null;
+        if (nuevaFilaFija === filaFijaActual) {
+            // Sigue siendo la misma — igual reaplico la altura por si cambió (ej. resize de ventana).
+            if (filaFijaActual) fijarFila(filaFijaActual, alturaHeader);
+            return;
         }
+        if (filaFijaActual) soltarFila(filaFijaActual);
+        if (nuevaFilaFija) fijarFila(nuevaFilaFija, alturaHeader);
+        filaFijaActual = nuevaFilaFija;
     }
 
     var actualizacionPendiente = false;
@@ -96,17 +91,13 @@ document.addEventListener('DOMContentLoaded', function () {
         actualizacionPendiente = true;
         requestAnimationFrame(function () {
             actualizacionPendiente = false;
-            actualizarBarraClienteActual();
+            actualizarFilaFija();
         });
     }
 
     if (contenedorScroll) {
-        medirAlturaEncabezado();
         contenedorScroll.addEventListener('scroll', pedirActualizacionBarra);
-        window.addEventListener('resize', function () {
-            medirAlturaEncabezado();
-            pedirActualizacionBarra();
-        });
+        window.addEventListener('resize', pedirActualizacionBarra);
     }
 
     // --- "Colapsar todo" — vuelve toda la tabla al estado inicial sin perder lo ya cargado (el caché

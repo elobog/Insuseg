@@ -743,38 +743,16 @@ table.insuseg-table tbody tr.fila-producto {
     color: var(--insuseg-orange);
 }
 
-/* Franja "estás viendo a…" — segunda fila del thead, pegajosa justo debajo de la de columnas.
-   Solo se muestra (JS la crea vacía y la llena/oculta según el scroll) mientras el cliente sobre el
-   que se scrolleó sigue expandido — evita perder de vista cuál cliente se está mirando al bajar por
-   un detalle largo, y colapsarlo no obliga a volver a subir hasta su fila (pedido del usuario,
-   2026-08-21). Un tono más claro que el header real para no confundirse con él. */
-.fila-cliente-actual-sticky td {
+/* Fila de cliente fijada — mientras el scroll está dentro del detalle de un cliente expandido, su
+   propia fila (con sus montos reales, no una franja aparte) se pega justo debajo del encabezado, para
+   poder seguir viendo su Total general/Peso/etc. mientras se lee la categoría/producto de más abajo
+   (pedido del usuario, 2026-08-21). El "top" de cada celda lo pone JS (altura real del encabezado,
+   no un valor fijo). El fondo ya lo pone la regla de abajo (.fila-cliente.expandida td) — acá solo
+   hace falta la sombra que la separe visualmente de las filas que scrollean por debajo. */
+.fila-cliente-fija td {
     position: sticky;
     z-index: 3;
-    background: #4a4a4a;
-    color: #fff;
-    padding: 0;
-    cursor: pointer;
-}
-
-.fila-cliente-actual-sticky td:hover {
-    background: #5a5a5a;
-}
-
-.cliente-actual-contenido {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.75rem;
-    font-size: 0.82rem;
-}
-
-.cliente-actual-contenido .chevron {
-    transform: rotate(90deg);
-}
-
-.cliente-actual-contenido b {
-    font-weight: 700;
+    box-shadow: 0 2px 4px -2px rgba(0, 0, 0, 0.25);
 }
 
 /* Encabezados ordenables — clic para ordenar por esa columna, clic de nuevo invierte el sentido.
