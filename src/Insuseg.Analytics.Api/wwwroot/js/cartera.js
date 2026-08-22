@@ -28,6 +28,100 @@ document.addEventListener('DOMContentLoaded', function () {
         return totalColumnas;
     }
 
+    // --- Franja "estás viendo a…" — segunda fila del thead, pegajosa justo debajo de la de columnas.
+    //     Solo aparece mientras el cliente sobre cuyo detalle se scrolleó sigue expandido; clic la
+    //     colapsa sin tener que volver a subir hasta su fila (pedido del usuario, 2026-08-21). ---
+    var filaClienteActual = document.createElement('tr');
+    filaClienteActual.className = 'fila-cliente-actual-sticky';
+    filaClienteActual.style.display = 'none';
+    var tdClienteActual = document.createElement('td');
+    var contenidoClienteActual = document.createElement('div');
+    contenidoClienteActual.className = 'cliente-actual-contenido';
+    var chevronClienteActual = document.createElement('span');
+    chevronClienteActual.className = 'chevron';
+    chevronClienteActual.textContent = '▶';
+    var textoClienteActual = document.createElement('span');
+    contenidoClienteActual.appendChild(chevronClienteActual);
+    contenidoClienteActual.appendChild(textoClienteActual);
+    tdClienteActual.appendChild(contenidoClienteActual);
+    filaClienteActual.appendChild(tdClienteActual);
+    thead.appendChild(filaClienteActual);
+
+    var contenedorScroll = tabla.closest('.tabla-vertical-limitada');
+    var filaClienteActualReferencia = null;
+
+    function medirAlturaEncabezado() {
+        var filaEncabezado = thead.querySelector('tr:not(.fila-cliente-actual-sticky)');
+        tdClienteActual.style.top = filaEncabezado.getBoundingClientRect().height + 'px';
+        tdClienteActual.colSpan = colspanFila();
+    }
+
+    filaClienteActual.addEventListener('click', function () {
+        if (filaClienteActualReferencia) {
+            alternarCliente(filaClienteActualReferencia);
+        }
+    });
+
+    function actualizarBarraClienteActual() {
+        if (!contenedorScroll) return;
+        var rectContenedor = contenedorScroll.getBoundingClientRect();
+        var limiteVisible = rectContenedor.top + thead.querySelector('tr:not(.fila-cliente-actual-sticky)').getBoundingClientRect().height;
+        var clientes = tbody.querySelectorAll('tr.fila-cliente');
+        var actual = null;
+        for (var i = 0; i < clientes.length; i++) {
+            var rectFila = clientes[i].getBoundingClientRect();
+            if (rectFila.top <= limiteVisible + 1) {
+                actual = clientes[i];
+            } else {
+                break; // las filas están en el mismo orden visual que el documento
+            }
+        }
+
+        if (actual && actual.classList.contains('expandida')) {
+            filaClienteActualReferencia = actual;
+            textoClienteActual.replaceChildren(
+                document.createTextNode('Viendo a '),
+                (function () { var b = document.createElement('b'); b.textContent = actual.querySelector('.nombre-cliente-texto').textContent; return b; })(),
+                document.createTextNode(' — clic para colapsar'));
+            filaClienteActual.style.display = 'table-row';
+        } else {
+            filaClienteActualReferencia = null;
+            filaClienteActual.style.display = 'none';
+        }
+    }
+
+    var actualizacionPendiente = false;
+    function pedirActualizacionBarra() {
+        if (actualizacionPendiente) return;
+        actualizacionPendiente = true;
+        requestAnimationFrame(function () {
+            actualizacionPendiente = false;
+            actualizarBarraClienteActual();
+        });
+    }
+
+    if (contenedorScroll) {
+        medirAlturaEncabezado();
+        contenedorScroll.addEventListener('scroll', pedirActualizacionBarra);
+        window.addEventListener('resize', function () {
+            medirAlturaEncabezado();
+            pedirActualizacionBarra();
+        });
+    }
+
+    // --- "Colapsar todo" — vuelve toda la tabla al estado inicial sin perder lo ya cargado (el caché
+    //     de categorías/productos queda intacto, así que reabrir después no vuelve a pedir nada). ---
+    var botonColapsarTodo = document.getElementById('btn-colapsar-todo');
+    if (botonColapsarTodo) {
+        botonColapsarTodo.addEventListener('click', function () {
+            tbody.querySelectorAll('.expandida').forEach(function (fila) { fila.classList.remove('expandida'); });
+            tbody.querySelectorAll('.fila-categoria, .fila-producto, .fila-estado').forEach(function (fila) {
+                fila.style.display = 'none';
+            });
+            pedirActualizacionBarra();
+        });
+    }
+
     // --- Expandir/colapsar cliente (nivel 0) ---
     tabla.addEventListener('click', function (evento) {
         var filaCliente = evento.target.closest('.fila-cliente');
@@ -49,9 +143,11 @@ document.addEventListener('DOMContentLoaded', function () {
             var filaCarga = crearFilaCargando();
             filaCliente.after(filaCarga);
             cargarCategorias(cardCode, filaCliente, filaCarga);
+            pedirActualizacionBarra();
             return;
         }
         sincronizarVisibilidadHijos(filaCliente);
+        pedirActualizacionBarra();
     }
 
     function alternarCategoria(filaCategoria) {
@@ -64,9 +160,11 @@ document.addEventListener('DOMContentLoaded', function () {
             var filaCarga = crearFilaCargando();
             filaCategoria.after(filaCarga);
             cargarProductos(cardCode, categoriaCodigo, filaCategoria.dataset.categoriaNombre, filaCategoria, filaCarga);
+            pedirActualizacionBarra();
             return;
         }
         sincronizarVisibilidadHijos(filaCategoria);
+        pedirActualizacionBarra();
     }
 
     // Muestra/oculta los hijos DIRECTOS de una fila según si esta quedó expandida — los nietos (si los
@@ -159,9 +257,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 // las filas recién insertadas nacen visibles por defecto, esto las oculta si ya no
                 // corresponde mostrarlas.
                 sincronizarVisibilidadHijos(filaCliente);
+                pedirActualizacionBarra();
             })
             .catch(function () {
                 filaCarga.replaceWith(crearFilaMensaje('No se pudo cargar el detalle de categorías.'));
+                pedirActualizacionBarra();
             });
     }
 
@@ -194,9 +294,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                 filaCarga.replaceWith.apply(filaCarga, filas);
                 sincronizarVisibilidadHijos(filaCategoria);
+                pedirActualizacionBarra();
             })
             .catch(function () {
                 filaCarga.replaceWith(crearFilaMensaje('No se pudo cargar el detalle de productos.'));
+                pedirActualizacionBarra();
             });
     }
 
@@ -302,6 +404,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
             contador.textContent = termino === '' ? '' : (visibles + ' de ' + total + ' cliente(s)');
+            pedirActualizacionBarra();
         });
     }
 
@@ -367,6 +470,7 @@ document.addEventListener('DOMContentLoaded', function () {
             n++;
             filaCliente.cells[0].textContent = n;
         });
+        pedirActualizacionBarra();
     }
 
     function valorDeCelda(celda, tipo) {

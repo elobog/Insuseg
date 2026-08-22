@@ -724,6 +724,59 @@ table.insuseg-table tbody tr.fila-producto {
     white-space: nowrap;
 }
 
+/* Botón chico secundario, mismo look que "Expandir tabla" — para acciones de apoyo, no la acción
+   principal de la página (esa es .insuseg-btn, sólido en naranja). "Colapsar todo" vive acá porque
+   sin él, con varios clientes expandidos a la vez, no hay forma rápida de volver al estado inicial
+   sin cerrar uno por uno (pedido del usuario, 2026-08-21). */
+.btn-secundario-chico {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--insuseg-gray-light);
+    color: var(--insuseg-dark);
+    padding: 0.3rem 0.7rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.btn-secundario-chico:hover {
+    border-color: var(--insuseg-orange);
+    color: var(--insuseg-orange);
+}
+
+/* Franja "estás viendo a…" — segunda fila del thead, pegajosa justo debajo de la de columnas.
+   Solo se muestra (JS la crea vacía y la llena/oculta según el scroll) mientras el cliente sobre el
+   que se scrolleó sigue expandido — evita perder de vista cuál cliente se está mirando al bajar por
+   un detalle largo, y colapsarlo no obliga a volver a subir hasta su fila (pedido del usuario,
+   2026-08-21). Un tono más claro que el header real para no confundirse con él. */
+.fila-cliente-actual-sticky td {
+    position: sticky;
+    z-index: 3;
+    background: #4a4a4a;
+    color: #fff;
+    padding: 0;
+    cursor: pointer;
+}
+
+.fila-cliente-actual-sticky td:hover {
+    background: #5a5a5a;
+}
+
+.cliente-actual-contenido {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+}
+
+.cliente-actual-contenido .chevron {
+    transform: rotate(90deg);
+}
+
+.cliente-actual-contenido b {
+    font-weight: 700;
+}
+
 /* Encabezados ordenables — clic para ordenar por esa columna, clic de nuevo invierte el sentido.
    La flecha (▲/▼) solo se muestra en la columna con el orden activo; el resto queda neutro para no
    sugerir que todas las columnas ya tienen un orden aplicado. */
